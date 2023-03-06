@@ -39,7 +39,7 @@ FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.2.1 AS xx
 # use Ubuntu instead of Golang cause xx-apt only works in Debian sid
 FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS golatest
 ARG GO_VERSION
-RUN apt update && apt install -y golang=${GO_VERSION}
+RUN apt update && apt install -y golang=${GO_VERSION} git
 
 # git stage is used for checking out remote repository sources
 FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS git
