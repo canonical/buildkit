@@ -23,7 +23,7 @@ FROM minio/minio:${MINIO_VERSION} AS minio
 FROM minio/mc:${MINIO_MC_VERSION} AS minio-mc
 
 # ubuntu base for buildkit image
-FROM ubuntu:${UBUNTU_VERSION} AS ubuntu-amd64
+FROM amd64/ubuntu:${UBUNTU_VERSION} AS ubuntu-amd64
 FROM arm32v7/ubuntu:${UBUNTU_VERSION} AS ubuntu-arm
 FROM arm64v8/ubuntu:${UBUNTU_VERSION} AS ubuntu-arm64
 FROM s390x/ubuntu:${UBUNTU_VERSION} AS ubuntu-s390x
@@ -44,25 +44,20 @@ RUN apt update && apt install -y git
 
 # gobuild is base stage for compiling go/cgo
 FROM golatest AS gobuild-base
-RUN apt update && apt install -y file clang lld
 COPY --link --from=xx / /
-
-# runc source
-FROM git AS runc-src
-ARG RUNC_VERSION
-WORKDIR /usr/src
-RUN git clone https://github.com/opencontainers/runc.git runc \
-  && cd runc && git checkout -q "$RUNC_VERSION"
 
 # build runc binary
 FROM gobuild-base AS runc
 WORKDIR $GOPATH/src/github.com/opencontainers/runc
 ARG TARGETPLATFORM
+ARG RUNC_VERSION
+RUN git clone https://github.com/opencontainers/runc.git runc \
+  && cd runc && git checkout -q "$RUNC_VERSION"
 # gcc is only installed for libgcc
 # lld has issues building static binaries for ppc so prefer ld for it
-RUN set -e; xx-apt install -y musl-dev gcc libseccomp-dev libseccomp2 dpkg-dev; \
+RUN set -e; xx-apt install -y libseccomp-dev dpkg-dev gcc; \
   [ "$(xx-info arch)" != "ppc64le" ] || XX_CC_PREFER_LINKER=ld xx-clang --setup-target-triple
-RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
+RUN --mount=target=/root/.cache,type=cache \
   CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
   xx-verify --static /usr/bin/runc
 
