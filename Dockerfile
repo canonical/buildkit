@@ -15,7 +15,7 @@ ARG MINIO_VERSION=RELEASE.2022-05-03T20-36-08Z
 ARG MINIO_MC_VERSION=RELEASE.2022-05-04T06-07-55Z
 ARG AZURITE_VERSION=3.18.0
 
-ARG GO_VERSION=1.20
+ARG GO_VERSION=2:1.18~0ubuntu2
 ARG UBUNTU_VERSION=22.04
 
 # minio for s3 integration tests
@@ -36,7 +36,10 @@ FROM ubuntu-$TARGETARCH AS ubuntubase
 FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.2.1 AS xx
 
 # go base image
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS golatest
+# use Ubuntu instead of Golang cause xx-apt only works in Debian sid
+FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS golatest
+ARG GO_VERSION
+RUN apt update && apt install -y golang=${GO_VERSION}
 
 # git stage is used for checking out remote repository sources
 FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS git
@@ -46,16 +49,20 @@ RUN apt update && apt install -y git
 FROM golatest AS gobuild-base
 COPY --link --from=xx / /
 
+# runc source
+FROM git AS runc-src
+ARG RUNC_VERSION
+WORKDIR /usr/src
+RUN git clone https://github.com/opencontainers/runc.git runc \
+  && cd runc && git checkout -q "$RUNC_VERSION"
+
 # build runc binary
 FROM gobuild-base AS runc
 WORKDIR $GOPATH/src/github.com/opencontainers/runc
 ARG TARGETPLATFORM
-ARG RUNC_VERSION
-RUN git clone https://github.com/opencontainers/runc.git . \
-  && git checkout -q "$RUNC_VERSION"
 # gcc is only installed for libgcc
 RUN set -e; xx-apt install -y libseccomp-dev dpkg-dev gcc
-RUN --mount=target=/root/.cache,type=cache \
+RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
   CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
   xx-verify --static /usr/bin/runc
 
