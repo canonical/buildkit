@@ -54,9 +54,7 @@ ARG RUNC_VERSION
 RUN git clone https://github.com/opencontainers/runc.git . \
   && git checkout -q "$RUNC_VERSION"
 # gcc is only installed for libgcc
-# lld has issues building static binaries for ppc so prefer ld for it
-RUN set -e; xx-apt install -y libseccomp-dev dpkg-dev gcc; \
-  [ "$(xx-info arch)" != "ppc64le" ] || XX_CC_PREFER_LINKER=ld xx-clang --setup-target-triple
+RUN set -e; xx-apt install -y libseccomp-dev dpkg-dev gcc
 RUN --mount=target=/root/.cache,type=cache \
   CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
   xx-verify --static /usr/bin/runc
