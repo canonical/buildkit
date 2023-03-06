@@ -51,8 +51,8 @@ FROM gobuild-base AS runc
 WORKDIR $GOPATH/src/github.com/opencontainers/runc
 ARG TARGETPLATFORM
 ARG RUNC_VERSION
-RUN git clone https://github.com/opencontainers/runc.git runc \
-  && cd runc && git checkout -q "$RUNC_VERSION"
+RUN git clone https://github.com/opencontainers/runc.git . \
+  && git checkout -q "$RUNC_VERSION"
 # gcc is only installed for libgcc
 # lld has issues building static binaries for ppc so prefer ld for it
 RUN set -e; xx-apt install -y libseccomp-dev dpkg-dev gcc; \
