@@ -33,15 +33,25 @@ changing the `alpine` base by `ubuntu` (22.04). All the other changes are simply
 tuning the CI/CD jobs to test, build and release this new Ubuntu-based BuildKit
 flavour, `canonical/buildkit`.
 
+At the moment, we are supporting `canonical/buildkit` for BuildKit **v0.11**.
+See the diff to the upstream project in [diff.v0.11.md](diff.v0.11.md).
 
+## Usage
 
-Diff with Upstream
+ - images are published in ghcr
+ - ...
 
+## Maintenance
 
+At the moment, we maintain and provide support for the following components:
+ - Root **Dockerfile**
+(see [build graph for v0.11](v0.11.ubuntu-dockerfilegraph.pdf)): 
+    - we ensure the following BuildKit images (aka build targets) are based on
+    an Ubuntu LTS distribution and kept up to date: `buildkit-linux`
+    - on a best-effort basis, we keep the remaining images (aka build targets)
+    based on the same Ubuntu LTS distribution, and up to date.
+ - **Tests**: we ensure the upstream CI/CD actions are adapted to the changes
+applied in this fork, such that the tests for the **supported components** pass.
 
-![dockerfilegraph](./Dockerfile.png)
-
-diff with upstream
-
-just buildkit, not the frontend
+> &#x26a0;&#xfe0f; We **DO NOT** maintain: ##TBD - (frontend?) ##
 
