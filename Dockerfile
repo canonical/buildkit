@@ -37,9 +37,12 @@ FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.2.1 AS xx
 
 # go base image
 # use Ubuntu instead of Golang cause xx-apt only works in Debian sid
+# and Golang is only based on stable versions of Debian
+# https://github.com/tonistiigi/xx/blob/3d00d096c8bf894ec29bae5caa5aea81d9c187a5/base/xx-apt#L41
 FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS golatest
 ARG GO_VERSION
-RUN apt update && apt install -y golang=${GO_VERSION} git
+RUN apt update && apt install -y golang=${GO_VERSION} git wget make
+ENV GOPATH "/go"
 
 # git stage is used for checking out remote repository sources
 FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS git
@@ -227,7 +230,7 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
 
 FROM buildkit-base AS integration-tests-base
 ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
-RUN xx-apt install -y sudo vim iptables dnsmasq fuse curl \
+RUN xx-apt install -y sudo uidmap vim iptables dnsmasq fuse curl \
   && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
   && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
   && mkdir -m 0700 -p /run/user/1000 \
