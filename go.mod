@@ -1,4 +1,4 @@
-module github.com/canonical/buildkit
+module github.com/moby/buildkit
 
 go 1.19
 
