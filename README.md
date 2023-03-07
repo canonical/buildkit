@@ -33,3 +33,15 @@ changing the `alpine` base by `ubuntu` (22.04). All the other changes are simply
 tuning the CI/CD jobs to test, build and release this new Ubuntu-based BuildKit
 flavour, `canonical/buildkit`.
 
+
+
+Diff with Upstream
+
+
+
+![dockerfilegraph](./Dockerfile.png)
+
+diff with upstream
+
+just buildkit, not the frontend
+
