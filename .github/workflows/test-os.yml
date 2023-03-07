@@ -29,9 +29,10 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          # - ubuntu-20.04
+          - ubuntu-20.04
+          - ubuntu-latest
           # - macOS-11
-          - windows-2022
+          # - windows-2022
     steps:
       -
         name: Checkout
