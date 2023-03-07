@@ -140,7 +140,8 @@ FROM scratch AS release
 COPY --link --from=releaser /out/ /
 
 FROM ubuntubase AS buildkit-export
-RUN apt update && apt install -y fuse3 git openssh-server pigz xz-utils
+RUN apt update && apt install -y fuse3 git openssh-server pigz xz-utils && \
+  rm -rf /var/lib/apt/lists/*
 COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
 VOLUME /var/lib/buildkit
 
@@ -275,7 +276,8 @@ VOLUME /var/lib/buildkit
 
 # Rootless mode.
 FROM ubuntubase AS rootless
-RUN xx-apt install -y fuse3 fuse-overlayfs git openssh-server pigz shadow-uidmap xz-utils
+RUN apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils && \
+  rm -rf /var/lib/apt/lists/*
 RUN adduser -D -u 1000 user \
   && mkdir -p /run/user/1000 /home/user/.local/tmp /home/user/.local/share/buildkit \
   && chown -R user /run/user/1000 /home/user \
