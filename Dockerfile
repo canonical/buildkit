@@ -276,7 +276,8 @@ VOLUME /var/lib/buildkit
 
 # Rootless mode.
 FROM ubuntubase AS rootless
-RUN apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils && \
+RUN apt update && \
+  apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils && \
   rm -rf /var/lib/apt/lists/*
 RUN adduser -D -u 1000 user \
   && mkdir -p /run/user/1000 /home/user/.local/tmp /home/user/.local/share/buildkit \
