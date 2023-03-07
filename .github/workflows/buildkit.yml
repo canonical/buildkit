@@ -65,7 +65,7 @@ jobs:
         id: prep
         run: |
           TAG=pr
-          PUSH=false
+          PUSH=push
           if [ "${{ github.event_name }}" = "schedule" ]; then
             TAG=nightly
             PUSH=push
