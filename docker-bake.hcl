@@ -10,9 +10,14 @@ variable "NODE_VERSION" {
   default = null
 }
 
+variable "UBUNTU_VERSION" {
+  default = null
+}
+
 target "_common" {
   args = {
     ALPINE_VERSION = ALPINE_VERSION
+    UBUNTU_VERSION = UBUNTU_VERSION
     GO_VERSION = GO_VERSION
     NODE_VERSION = NODE_VERSION
     BUILDKIT_CONTEXT_KEEP_GIT_DIR = 1

@@ -2,8 +2,8 @@
 
 ARG NODE_VERSION=19
 
-FROM node:${NODE_VERSION}-alpine AS base
-RUN apk add --no-cache git
+FROM node:${NODE_VERSION} AS base
+RUN apt update && apt install -y git
 WORKDIR /src
 
 FROM base AS doctoc

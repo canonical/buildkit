@@ -15,7 +15,7 @@ RUN <<EOT
   wget -q https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${TARGETOS}-${arch}.zip
   unzip protoc-${PROTOC_VERSION}-${TARGETOS}-${arch}.zip -d /usr/local
 EOT
-WORKDIR /go/src/github.com/moby/buildkit
+WORKDIR /go/src/github.com/canonical/buildkit
 
 FROM base AS tools
 RUN --mount=type=bind,target=.,rw \

@@ -2,8 +2,8 @@
 
 ARG GO_VERSION=1.20
 
-FROM golang:${GO_VERSION}-alpine AS base
-RUN apk add --no-cache git rsync
+FROM golang:${GO_VERSION} AS base
+RUN apt update && apt install -y git rsync
 WORKDIR /src
 
 FROM base AS vendored

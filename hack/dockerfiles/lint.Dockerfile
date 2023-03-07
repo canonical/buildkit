@@ -2,9 +2,9 @@
 
 ARG GO_VERSION=1.20
 
-FROM golang:${GO_VERSION}-alpine
+FROM golang:${GO_VERSION}
 ENV GOFLAGS="-buildvcs=false"
-RUN apk add --no-cache gcc musl-dev yamllint
+RUN apt update && apt install -y gcc musl-dev yamllint
 RUN wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.51.1
 WORKDIR /go/src/github.com/moby/buildkit
 RUN --mount=target=/go/src/github.com/moby/buildkit --mount=target=/root/.cache,type=cache \

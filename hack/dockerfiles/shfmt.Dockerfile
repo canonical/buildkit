@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile-upstream:master
 
-FROM mvdan/shfmt:v3.1.2-alpine AS shfmt
+FROM mvdan/shfmt:v3.1.2 AS shfmt
 WORKDIR /src
 ARG SHFMT_FLAGS="-i 2 -ci"
 
