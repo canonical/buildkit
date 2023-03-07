@@ -8,7 +8,7 @@
 # dest    buildx-stable-1
 # result  canonical/buildkit:v0.8.1          > canonical/buildkit:buildx-stable-1
 #         canonical/buildkit:v0.8.1-rootless > canonical/buildkit:buildx-stable-1-rootless
-#
+# ------------------------------------------------
 # Ubuntu rebase:
 # source  latest
 # dest    buildx-stable-1
@@ -66,6 +66,7 @@ jobs:
         if: github.event.inputs.dry-run != 'true'
         uses: docker/login-action@v2
         with:
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
