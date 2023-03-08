@@ -1,17 +1,8 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..16036e0 100644
+index 40d60dc..12f0621 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
-@@ -6,7 +6,7 @@ concurrency:
- 
- on:
-   schedule:
--    - cron: '0 10 * * *'  # everyday at 10am
-+    - cron: '0 8 * * *'  # everyday at 10am
-   workflow_dispatch:
-   push:
-     branches:
 @@ -22,8 +22,13 @@ on:
        - 'frontend/dockerfile/docs/**'
  
@@ -271,6 +262,76 @@ index d9c6554..35bfbf1 100644
        -
          name: Create
          run: |
+diff --git upstream/v0.11/.github/workflows/diff.yml origin/v0.11/.github/workflows/diff.yml
+new file mode 100644
+index 0000000..7a55687
+--- /dev/null
++++ origin/v0.11/.github/workflows/diff.yml
+@@ -0,0 +1,64 @@
++name: diff
++
++on:
++  workflow_dispatch:
++  push:
++    branches:
++      - 'v[0-9]+.[0-9]+'
++    tags:
++      - 'v*'
++  schedule:
++    - cron: '0 11 * * *'  # everyday at 11am
++
++concurrency:
++  group: ${{ github.workflow }}-${{ github.ref }}
++  cancel-in-progress: true
++
++env:
++  SRC_REMOTE: upstream
++  DST_REMOTE: origin
++  SRC_REPO: https://github.com/moby/buildkit
++
++jobs:
++  update-diffs:
++    runs-on: ubuntu-22.04
++    strategy:
++      fail-fast: false
++      matrix:
++        ref:
++          - 'v0.11'
++    steps:
++      - uses: actions/checkout@v3
++        with:
++          ref: 'main'
++
++      - name: Prepare
++        run: |
++          git remote add ${{ env.SRC_REMOTE }} ${{ env.SRC_REPO }}
++          git fetch --depth=1 ${{ env.SRC_REMOTE }} ${{ matrix.ref }}
++
++          git remote add ${{ env.DST_REMOTE }} ${{ github.repositoryUrl }} || true
++          git fetch --depth=1 ${{ env.DST_REMOTE }} ${{ matrix.ref }}
++
++      - name: Diff
++        run: |
++          cat > diff.${{ matrix.ref }}.md <<EOF
++          \`\`\`diff
++          $(git diff ${{ env.SRC_REMOTE }}/${{ matrix.ref }} \
++                      ${{ env.DST_REMOTE }}/${{ matrix.ref }} \
++                      --src-prefix=${{ env.SRC_REMOTE }}/${{ matrix.ref }}/ \
++                      --dst-prefix=${{ env.DST_REMOTE }}/${{ matrix.ref }}/)
++          \`\`\`
++          EOF
++
++      - name: Commit changes
++        uses: EndBug/add-and-commit@v9
++        with:
++          message: 'Automatic update for diff.${{ matrix.ref }}.md'
++          add: 'diff.${{ matrix.ref }}.md'
++          push: origin main
++
++      - uses: actions/upload-artifact@v3
++        with:
++          name: diff.${{ matrix.ref }}.md
++          path: diff.${{ matrix.ref }}.md
 diff --git upstream/v0.11/.github/workflows/validate.yml origin/v0.11/.github/workflows/validate.yml
 index 21bdc61..75513ab 100644
 --- upstream/v0.11/.github/workflows/validate.yml
@@ -286,7 +347,7 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index b64f57b..f621636 100644
+index b64f57b..7a79811 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
 @@ -12,31 +12,36 @@ ARG NERDCTL_VERSION=v1.0.0
@@ -352,6 +413,15 @@ index b64f57b..f621636 100644
  RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
    CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
    xx-verify --static /usr/bin/runc
+@@ -75,7 +78,7 @@ ENV GOFLAGS=-mod=vendor
+ FROM buildkit-base AS buildkit-version
+ # TODO: PKG should be inferred from go modules
+ RUN --mount=target=. \
+-  PKG=github.com/moby/buildkit VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always --tags) REVISION=$(git rev-parse HEAD)$(if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi); \
++  PKG=github.com/canonical/buildkit VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always --tags) REVISION=$(git rev-parse HEAD)$(if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi); \
+   echo "-X ${PKG}/version.Version=${VERSION} -X ${PKG}/version.Revision=${REVISION} -X ${PKG}/version.Package=${PKG}" | tee /tmp/.ldflags; \
+   echo -n "${VERSION}" | tee /tmp/.version;
+ 
 @@ -119,8 +122,8 @@ FROM binaries-$TARGETOS AS binaries
  # enable scanning for this stage
  ARG BUILDKIT_SBOM_SCAN_STAGE=true
@@ -420,6 +490,23 @@ index b64f57b..f621636 100644
    && mkdir -p /run/user/1000 /home/user/.local/tmp /home/user/.local/share/buildkit \
    && chown -R user /run/user/1000 /home/user \
    && echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid
+diff --git upstream/v0.11/Makefile origin/v0.11/Makefile
+index 813fcdf..70ab905 100644
+--- upstream/v0.11/Makefile
++++ origin/v0.11/Makefile
+@@ -5,9 +5,9 @@ binaries: FORCE
+ 	hack/binaries
+ 
+ images: FORCE
+-# moby/buildkit:local and moby/buildkit:local-rootless are created on Docker
+-	hack/images local moby/buildkit
+-	TARGET=rootless hack/images local moby/buildkit
++# canonical/buildkit:local and canonical/buildkit:local-rootless are created on Docker
++	hack/images local canonical/buildkit
++	TARGET=rootless hack/images local canonical/buildkit
+ 
+ install: FORCE
+ 	mkdir -p $(DESTDIR)$(bindir)
 diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
 index ed49f9c..82f829c 100644
 --- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
