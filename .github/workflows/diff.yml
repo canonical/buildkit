@@ -32,7 +32,7 @@ jobs:
           git remote add ${{ env.SRC_REMOTE }} ${{ env.SRC_REPO }}
           git fetch --depth=1 ${{ env.SRC_REMOTE }} ${{ matrix.ref }}
 
-          git remote add ${{ env.DST_REMOTE }} ${{ github.repositoryUrl }}
+          git remote add ${{ env.DST_REMOTE }} ${{ github.repositoryUrl }} || true
           git fetch --depth=1 ${{ env.DST_REMOTE }} ${{ matrix.ref }}
 
       - name: Diff
