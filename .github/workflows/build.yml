@@ -6,7 +6,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: '15 9 * * *'  # everyday at 10am
+    - cron: '0 10 * * *'  # everyday at 10am
   workflow_dispatch:
   push:
     branches:
