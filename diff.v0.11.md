@@ -1,17 +1,8 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..8a0e84d 100644
+index 40d60dc..12f0621 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
-@@ -6,7 +6,7 @@ concurrency:
- 
- on:
-   schedule:
--    - cron: '0 10 * * *'  # everyday at 10am
-+    - cron: '15 9 * * *'  # everyday at 10am
-   workflow_dispatch:
-   push:
-     branches:
 @@ -22,8 +22,13 @@ on:
        - 'frontend/dockerfile/docs/**'
  
@@ -273,7 +264,7 @@ index d9c6554..35bfbf1 100644
          run: |
 diff --git upstream/v0.11/.github/workflows/diff.yml origin/v0.11/.github/workflows/diff.yml
 new file mode 100644
-index 0000000..e3b91a6
+index 0000000..7a55687
 --- /dev/null
 +++ origin/v0.11/.github/workflows/diff.yml
 @@ -0,0 +1,64 @@
@@ -340,7 +331,7 @@ index 0000000..e3b91a6
 +      - uses: actions/upload-artifact@v3
 +        with:
 +          name: diff.${{ matrix.ref }}.md
-+          path: diff.${{ matrix.ref }}.md 
++          path: diff.${{ matrix.ref }}.md
 diff --git upstream/v0.11/.github/workflows/validate.yml origin/v0.11/.github/workflows/validate.yml
 index 21bdc61..75513ab 100644
 --- upstream/v0.11/.github/workflows/validate.yml
