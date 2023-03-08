@@ -15,10 +15,9 @@ env:
   SRC_REMOTE: upstream
   DST_REMOTE: origin
   SRC_REPO: https://github.com/moby/buildkit
-  DST_REPO: https://github.com/canonical/buildkit
 
 jobs:
-  get-diff:
+  update-diffs:
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -26,13 +25,14 @@ jobs:
         ref:
           - 'v0.11'
     steps:
+      - uses: actions/checkout@v3
+
       - name: Prepare
         run: |
-          git init .
           git remote add ${{ env.SRC_REMOTE }} ${{ env.SRC_REPO }}
           git fetch --depth=1 ${{ env.SRC_REMOTE }} ${{ matrix.ref }}
 
-          git remote add ${{ env.DST_REMOTE }} ${{ env.DST_REPO }}
+          git remote add ${{ env.DST_REMOTE }} ${{ github.repositoryUrl }}
           git fetch --depth=1 ${{ env.DST_REMOTE }} ${{ matrix.ref }}
 
       - name: Diff
@@ -46,28 +46,13 @@ jobs:
           \`\`\`
           EOF
 
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v9
+        with:
+          message: 'Automatic update for diff.${{ matrix.ref }}.md'
+          add: 'diff.${{ matrix.ref }}.md'
+
       - uses: actions/upload-artifact@v3
         with:
           name: diff.${{ matrix.ref }}.md
           path: diff.${{ matrix.ref }}.md 
-
-  commit:
-    runs-on: ubuntu-22.04
-    needs: [get-diff]
-    steps:
-      - uses: actions/checkout@v3
-
-      # remove existing files otherwise the download-artifact will panic
-      - name: Cleanup
-        run: |
-          rm diff.*.md || true
-
-      - uses: actions/download-artifact@v3
-        with:
-          path: .
-
-      - name: Commit changes
-        uses: EndBug/add-and-commit@v9
-        with:
-          message: 'Automatic update of diff files'
-          add: 'diff.*.md'

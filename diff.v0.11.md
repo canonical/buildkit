@@ -1,8 +1,17 @@
 ```diff
-diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
-index 40d60dc7..12f06217 100644
---- a/.github/workflows/build.yml
-+++ b/.github/workflows/build.yml
+diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
+index 40d60dc..16036e0 100644
+--- upstream/v0.11/.github/workflows/build.yml
++++ origin/v0.11/.github/workflows/build.yml
+@@ -6,7 +6,7 @@ concurrency:
+ 
+ on:
+   schedule:
+-    - cron: '0 10 * * *'  # everyday at 10am
++    - cron: '0 8 * * *'  # everyday at 10am
+   workflow_dispatch:
+   push:
+     branches:
 @@ -22,8 +22,13 @@ on:
        - 'frontend/dockerfile/docs/**'
  
@@ -214,10 +223,10 @@ index 40d60dc7..12f06217 100644
 +#         PLATFORMS: ${{ env.PLATFORMS }},linux/386,linux/mips,linux/mipsle,linux/mips64,linux/mips64le
 +#         CACHE_FROM: type=gha,scope=${{ env.CACHE_SCOPE }}
 +#         CACHE_TO: type=gha,scope=${{ env.CACHE_SCOPE }}
-diff --git a/.github/workflows/buildx-image.yml b/.github/workflows/buildx-image.yml
-index d9c65548..35bfbf1d 100644
---- a/.github/workflows/buildx-image.yml
-+++ b/.github/workflows/buildx-image.yml
+diff --git upstream/v0.11/.github/workflows/buildx-image.yml origin/v0.11/.github/workflows/buildx-image.yml
+index d9c6554..35bfbf1 100644
+--- upstream/v0.11/.github/workflows/buildx-image.yml
++++ origin/v0.11/.github/workflows/buildx-image.yml
 @@ -1,3 +1,4 @@
 +# ORIGINAL:
  # source  latest
@@ -262,10 +271,10 @@ index d9c65548..35bfbf1d 100644
        -
          name: Create
          run: |
-diff --git a/.github/workflows/validate.yml b/.github/workflows/validate.yml
-index 21bdc619..75513abb 100644
---- a/.github/workflows/validate.yml
-+++ b/.github/workflows/validate.yml
+diff --git upstream/v0.11/.github/workflows/validate.yml origin/v0.11/.github/workflows/validate.yml
+index 21bdc61..75513ab 100644
+--- upstream/v0.11/.github/workflows/validate.yml
++++ origin/v0.11/.github/workflows/validate.yml
 @@ -16,6 +16,9 @@ on:
    pull_request:
  
@@ -276,10 +285,10 @@ index 21bdc619..75513abb 100644
    REPO_SLUG_ORIGIN: "moby/buildkit:latest"
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
-diff --git a/Dockerfile b/Dockerfile
-index b64f57bd..f6216366 100644
---- a/Dockerfile
-+++ b/Dockerfile
+diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
+index b64f57b..f621636 100644
+--- upstream/v0.11/Dockerfile
++++ origin/v0.11/Dockerfile
 @@ -12,31 +12,36 @@ ARG NERDCTL_VERSION=v1.0.0
  ARG DNSNAME_VERSION=v1.3.1
  ARG NYDUS_VERSION=v2.1.0
@@ -411,10 +420,10 @@ index b64f57bd..f6216366 100644
    && mkdir -p /run/user/1000 /home/user/.local/tmp /home/user/.local/share/buildkit \
    && chown -R user /run/user/1000 /home/user \
    && echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid
-diff --git a/frontend/dockerfile/dockerfile_test.go b/frontend/dockerfile/dockerfile_test.go
-index ed49f9c8..82f829cf 100644
---- a/frontend/dockerfile/dockerfile_test.go
-+++ b/frontend/dockerfile/dockerfile_test.go
+diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
+index ed49f9c..82f829c 100644
+--- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
++++ origin/v0.11/frontend/dockerfile/dockerfile_test.go
 @@ -6557,7 +6557,7 @@ FROM scratch
  COPY --from=0 / /
  `)
