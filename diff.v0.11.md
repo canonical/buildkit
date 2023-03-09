@@ -347,10 +347,10 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index b64f57b..7a79811 100644
+index b64f57b..1203eca 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
-@@ -12,31 +12,36 @@ ARG NERDCTL_VERSION=v1.0.0
+@@ -12,31 +12,37 @@ ARG NERDCTL_VERSION=v1.0.0
  ARG DNSNAME_VERSION=v1.3.1
  ARG NYDUS_VERSION=v2.1.0
  
@@ -365,7 +365,7 @@ index b64f57b..7a79811 100644
 -FROM alpine:${ALPINE_VERSION} AS alpine-ppc64le
 -FROM alpine:edge@sha256:c223f84e05c23c0571ce8decefef818864869187e1a3ea47719412e205c8c64e AS alpine-riscv64
 -FROM alpine-$TARGETARCH AS alpinebase
-+ARG UBUNTU_VERSION=22.04
++ARG UBUNTU_VERSION=20.04
 +
 +# ubuntu base for buildkit image
 +# TODO: remove this when ubuntu image supports riscv64 again
@@ -385,7 +385,8 @@ index b64f57b..7a79811 100644
 +# use Ubuntu instead of Golang cause xx-apt only works in Debian sid
 +# and Golang is only based on stable versions of Debian
 +# https://github.com/tonistiigi/xx/blob/3d00d096c8bf894ec29bae5caa5aea81d9c187a5/base/xx-apt#L41
-+FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS golatest
++# And it can't be <jammy otherwise the Golang version will be too old
++FROM --platform=$BUILDPLATFORM ubuntu:jammy AS golatest
 +ARG GO_VERSION
 +RUN apt update && apt install -y golang=2:1.18~0ubuntu2 git wget make
 +ENV GOPATH "/go"
@@ -402,7 +403,7 @@ index b64f57b..7a79811 100644
  COPY --link --from=xx / /
  
  # runc source
-@@ -51,9 +56,7 @@ FROM gobuild-base AS runc
+@@ -51,9 +57,7 @@ FROM gobuild-base AS runc
  WORKDIR $GOPATH/src/github.com/opencontainers/runc
  ARG TARGETPLATFORM
  # gcc is only installed for libgcc
@@ -413,7 +414,7 @@ index b64f57b..7a79811 100644
  RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
    CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
    xx-verify --static /usr/bin/runc
-@@ -75,7 +78,7 @@ ENV GOFLAGS=-mod=vendor
+@@ -75,7 +79,7 @@ ENV GOFLAGS=-mod=vendor
  FROM buildkit-base AS buildkit-version
  # TODO: PKG should be inferred from go modules
  RUN --mount=target=. \
@@ -422,7 +423,7 @@ index b64f57b..7a79811 100644
    echo "-X ${PKG}/version.Version=${VERSION} -X ${PKG}/version.Revision=${REVISION} -X ${PKG}/version.Package=${PKG}" | tee /tmp/.ldflags; \
    echo -n "${VERSION}" | tee /tmp/.version;
  
-@@ -119,8 +122,8 @@ FROM binaries-$TARGETOS AS binaries
+@@ -119,8 +123,8 @@ FROM binaries-$TARGETOS AS binaries
  # enable scanning for this stage
  ARG BUILDKIT_SBOM_SCAN_STAGE=true
  
@@ -433,7 +434,7 @@ index b64f57b..7a79811 100644
  WORKDIR /work
  ARG TARGETPLATFORM
  RUN --mount=from=binaries \
-@@ -130,9 +133,9 @@ RUN --mount=from=binaries \
+@@ -130,9 +134,9 @@ RUN --mount=from=binaries \
  FROM scratch AS release
  COPY --link --from=releaser /out/ /
  
@@ -441,12 +442,12 @@ index b64f57b..7a79811 100644
 -RUN apk add --no-cache fuse3 git openssh pigz xz \
 -  && ln -s fusermount3 /usr/bin/fusermount
 +FROM ubuntubase AS buildkit-export
-+RUN apt update && apt install -y fuse3 git openssh-server pigz xz-utils \
++RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils \
 +  && rm -rf /var/lib/apt/lists/*
  COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
  VOLUME /var/lib/buildkit
  
-@@ -146,7 +149,7 @@ FROM gobuild-base AS containerd-base
+@@ -146,7 +150,7 @@ FROM gobuild-base AS containerd-base
  WORKDIR /go/src/github.com/containerd/containerd
  ARG TARGETPLATFORM
  ENV CGO_ENABLED=1 BUILDTAGS=no_btrfs GO111MODULE=off
@@ -455,7 +456,7 @@ index b64f57b..7a79811 100644
  
  FROM containerd-base AS containerd
  ARG CONTAINERD_VERSION
-@@ -211,8 +214,8 @@ FROM binaries AS buildkit-windows
+@@ -211,8 +215,8 @@ FROM binaries AS buildkit-windows
  # this is not in binaries-windows because it is not intended for release yet, just CI
  COPY --link --from=buildkitd /usr/bin/buildkitd /buildkitd.exe
  
@@ -466,7 +467,7 @@ index b64f57b..7a79811 100644
  ARG CNI_VERSION
  ARG TARGETOS
  ARG TARGETARCH
-@@ -223,7 +226,7 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
+@@ -223,7 +227,7 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
  FROM buildkit-base AS integration-tests-base
  ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
  ARG NERDCTL_VERSION
@@ -475,7 +476,7 @@ index b64f57b..7a79811 100644
    && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
    && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
    && mkdir -m 0700 -p /run/user/1000 \
-@@ -261,9 +264,11 @@ FROM integration-tests AS dev-env
+@@ -261,9 +265,11 @@ FROM integration-tests AS dev-env
  VOLUME /var/lib/buildkit
  
  # Rootless mode.
@@ -484,7 +485,7 @@ index b64f57b..7a79811 100644
 -RUN adduser -D -u 1000 user \
 +FROM ubuntubase AS rootless
 +RUN apt update && \
-+  apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils && \
++  DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils && \
 +  rm -rf /var/lib/apt/lists/*
 +RUN adduser --disabled-password --gecos "" -uid 1000 user \
    && mkdir -p /run/user/1000 /home/user/.local/tmp /home/user/.local/share/buildkit \
