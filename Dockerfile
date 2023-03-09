@@ -12,7 +12,7 @@ ARG NERDCTL_VERSION=v1.0.0
 ARG DNSNAME_VERSION=v1.3.1
 ARG NYDUS_VERSION=v2.1.0
 
-ARG UBUNTU_VERSION=22.04
+ARG UBUNTU_VERSION=20.04
 
 # ubuntu base for buildkit image
 # TODO: remove this when ubuntu image supports riscv64 again
@@ -31,7 +31,8 @@ FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.2.1 AS xx
 # use Ubuntu instead of Golang cause xx-apt only works in Debian sid
 # and Golang is only based on stable versions of Debian
 # https://github.com/tonistiigi/xx/blob/3d00d096c8bf894ec29bae5caa5aea81d9c187a5/base/xx-apt#L41
-FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS golatest
+# And it can't be <jammy otherwise the Golang version will be too old
+FROM --platform=$BUILDPLATFORM ubuntu:jammy AS golatest
 ARG GO_VERSION
 RUN apt update && apt install -y golang=2:1.18~0ubuntu2 git wget make
 ENV GOPATH "/go"
@@ -134,7 +135,7 @@ FROM scratch AS release
 COPY --link --from=releaser /out/ /
 
 FROM ubuntubase AS buildkit-export
-RUN apt update && apt install -y fuse3 git openssh-server pigz xz-utils \
+RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils \
   && rm -rf /var/lib/apt/lists/*
 COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
 VOLUME /var/lib/buildkit
@@ -266,7 +267,7 @@ VOLUME /var/lib/buildkit
 # Rootless mode.
 FROM ubuntubase AS rootless
 RUN apt update && \
-  apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils && \
+  DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils && \
   rm -rf /var/lib/apt/lists/*
 RUN adduser --disabled-password --gecos "" -uid 1000 user \
   && mkdir -p /run/user/1000 /home/user/.local/tmp /home/user/.local/share/buildkit \
