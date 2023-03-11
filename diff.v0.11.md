@@ -508,6 +508,18 @@ index 813fcdf..70ab905 100644
  
  install: FORCE
  	mkdir -p $(DESTDIR)$(bindir)
+diff --git upstream/v0.11/client/llb/definition.go origin/v0.11/client/llb/definition.go
+index f92ee2d..d6dda89 100644
+--- upstream/v0.11/client/llb/definition.go
++++ origin/v0.11/client/llb/definition.go
+@@ -209,7 +209,6 @@ func (d *DefinitionOp) Inputs() []Output {
+ 				dgst:       input.Digest,
+ 				index:      input.Index,
+ 				inputCache: d.inputCache,
+-				sources:    d.sources,
+ 			}
+ 			existingIndexes := d.inputCache[input.Digest]
+ 			indexDiff := int(input.Index) - len(existingIndexes)
 diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
 index ed49f9c..82f829c 100644
 --- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
