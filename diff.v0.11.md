@@ -508,6 +508,250 @@ index 813fcdf..70ab905 100644
  
  install: FORCE
  	mkdir -p $(DESTDIR)$(bindir)
+diff --git upstream/v0.11/client/build_test.go origin/v0.11/client/build_test.go
+index 75ebce6..1376c15 100644
+--- upstream/v0.11/client/build_test.go
++++ origin/v0.11/client/build_test.go
+@@ -1991,7 +1991,6 @@ func testClientGatewayContainerSignal(t *testing.T, sb integration.Sandbox) {
+ }
+ 
+ func testClientGatewayNilResult(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureMergeDiff)
+ 	requiresLinux(t)
+ 	c, err := New(sb.Context(), sb.Address())
+ 	require.NoError(t, err)
+diff --git upstream/v0.11/client/client_test.go origin/v0.11/client/client_test.go
+index 6ca36d2..b97eb75 100644
+--- upstream/v0.11/client/client_test.go
++++ origin/v0.11/client/client_test.go
+@@ -246,7 +246,7 @@ func newContainerd(cdAddress string) (*containerd.Client, error) {
+ 
+ // moby/buildkit#1336
+ func testCacheExportCacheKeyLoop(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport, integration.FeatureCacheBackendLocal)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	c, err := New(sb.Context(), sb.Address())
+ 	require.NoError(t, err)
+ 	defer c.Close()
+@@ -975,6 +975,7 @@ func testSecurityModeErrors(t *testing.T, sb integration.Sandbox) {
+ }
+ 
+ func testFrontendImageNaming(t *testing.T, sb integration.Sandbox) {
++	integration.CheckFeatureCompat(t, sb, integration.FeatureOCIExporter, integration.FeatureDirectPush)
+ 	requiresLinux(t)
+ 	c, err := New(sb.Context(), sb.Address())
+ 	require.NoError(t, err)
+@@ -1083,15 +1084,12 @@ func testFrontendImageNaming(t *testing.T, sb integration.Sandbox) {
+ 
+ 					switch exp {
+ 					case ExporterOCI:
+-						integration.CheckFeatureCompat(t, sb, integration.FeatureOCIExporter)
+ 						t.Skip("oci exporter does not support named images")
+ 					case ExporterDocker:
+-						integration.CheckFeatureCompat(t, sb, integration.FeatureOCIExporter)
+ 						outW, err := os.Create(out)
+ 						require.NoError(t, err)
+ 						so.Exports[0].Output = fixedWriteCloser(outW)
+ 					case ExporterImage:
+-						integration.CheckFeatureCompat(t, sb, integration.FeatureDirectPush)
+ 						imageName = registry + "/" + imageName
+ 						so.Exports[0].Attrs["push"] = "true"
+ 					}
+@@ -3750,11 +3748,7 @@ func testBuildPushAndValidate(t *testing.T, sb integration.Sandbox) {
+ }
+ 
+ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheBackendRegistry,
+-		integration.FeatureOCIExporter,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	requiresLinux(t)
+ 	cdAddress := sb.ContainerdAddress()
+ 	if cdAddress == "" || sb.Snapshotter() != "stargz" {
+@@ -3814,7 +3808,6 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
+ 
+ 	// clear all local state out
+ 	ensurePruneAll(t, c, sb)
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheImport, integration.FeatureDirectPush)
+ 
+ 	// stargz layers should be lazy even for executing something on them
+ 	def, err = baseDef.
+@@ -3902,12 +3895,7 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
+ }
+ 
+ func testStargzLazyInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendInline,
+-		integration.FeatureCacheBackendRegistry,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	requiresLinux(t)
+ 	cdAddress := sb.ContainerdAddress()
+ 	if cdAddress == "" || sb.Snapshotter() != "stargz" {
+@@ -4322,7 +4310,7 @@ func testLazyImagePush(t *testing.T, sb integration.Sandbox) {
+ }
+ 
+ func testZstdLocalCacheExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport, integration.FeatureCacheBackendLocal)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	c, err := New(sb.Context(), sb.Address())
+ 	require.NoError(t, err)
+ 	defer c.Close()
+@@ -4464,21 +4452,12 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
+ 	for _, ignoreError := range ignoreErrorValues {
+ 		ignoreErrStr := strconv.FormatBool(ignoreError)
+ 		for n, test := range tests {
+-			n := n
+ 			require.Equal(t, 1, len(test.Exports))
+ 			require.Equal(t, 1, len(test.CacheExports))
+ 			require.NotEmpty(t, test.CacheExports[0].Attrs)
+ 			test.CacheExports[0].Attrs["ignore-error"] = ignoreErrStr
+ 			testName := fmt.Sprintf("%s-%s", n, ignoreErrStr)
+ 			t.Run(testName, func(t *testing.T) {
+-				switch n {
+-				case "local-ignore-error":
+-					integration.CheckFeatureCompat(t, sb, integration.FeatureCacheBackendLocal)
+-				case "registry-ignore-error":
+-					integration.CheckFeatureCompat(t, sb, integration.FeatureCacheBackendRegistry)
+-				case "s3-ignore-error":
+-					integration.CheckFeatureCompat(t, sb, integration.FeatureCacheBackendS3)
+-				}
+ 				_, err = c.Solve(sb.Context(), def, SolveOpt{
+ 					Exports:      test.Exports,
+ 					CacheExports: test.CacheExports,
+@@ -4497,11 +4476,7 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
+ }
+ 
+ func testUncompressedLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendLocal,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	dir := t.TempDir()
+ 	im := CacheOptionsEntry{
+ 		Type: "local",
+@@ -4521,11 +4496,7 @@ func testUncompressedLocalCacheImportExport(t *testing.T, sb integration.Sandbox
+ }
+ 
+ func testUncompressedRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendRegistry,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	registry, err := sb.NewRegistry()
+ 	if errors.Is(err, integration.ErrRequirements) {
+ 		t.Skip(err.Error())
+@@ -4550,11 +4521,7 @@ func testUncompressedRegistryCacheImportExport(t *testing.T, sb integration.Sand
+ }
+ 
+ func testZstdLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendLocal,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	dir := t.TempDir()
+ 	im := CacheOptionsEntry{
+ 		Type: "local",
+@@ -4575,11 +4542,7 @@ func testZstdLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+ }
+ 
+ func testZstdRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendRegistry,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	registry, err := sb.NewRegistry()
+ 	if errors.Is(err, integration.ErrRequirements) {
+ 		t.Skip(err.Error())
+@@ -4667,11 +4630,7 @@ func testBasicCacheImportExport(t *testing.T, sb integration.Sandbox, cacheOptio
+ }
+ 
+ func testBasicRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendRegistry,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	registry, err := sb.NewRegistry()
+ 	if errors.Is(err, integration.ErrRequirements) {
+ 		t.Skip(err.Error())
+@@ -4688,11 +4647,7 @@ func testBasicRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
+ }
+ 
+ func testMultipleRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendRegistry,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	registry, err := sb.NewRegistry()
+ 	if errors.Is(err, integration.ErrRequirements) {
+ 		t.Skip(err.Error())
+@@ -4715,11 +4670,7 @@ func testMultipleRegistryCacheImportExport(t *testing.T, sb integration.Sandbox)
+ }
+ 
+ func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendLocal,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	dir := t.TempDir()
+ 	im := CacheOptionsEntry{
+ 		Type: "local",
+@@ -4737,11 +4688,7 @@ func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+ }
+ 
+ func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureDirectPush,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheBackendInline,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureDirectPush, integration.FeatureCacheImport)
+ 	requiresLinux(t)
+ 	registry, err := sb.NewRegistry()
+ 	if errors.Is(err, integration.ErrRequirements) {
+@@ -4793,7 +4740,6 @@ func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
+ 	require.NoError(t, err)
+ 
+ 	ensurePruneAll(t, c, sb)
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheImport, integration.FeatureCacheBackendRegistry)
+ 
+ 	resp, err = c.Solve(sb.Context(), def, SolveOpt{
+ 		// specifying inline cache exporter is needed for reproducing containerimage.digest
+@@ -5668,7 +5614,6 @@ func testProxyEnv(t *testing.T, sb integration.Sandbox) {
+ }
+ 
+ func testMergeOp(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureMergeDiff)
+ 	requiresLinux(t)
+ 
+ 	c, err := New(sb.Context(), sb.Address())
+@@ -5781,7 +5726,7 @@ func testMergeOpCacheMax(t *testing.T, sb integration.Sandbox) {
+ 
+ func testMergeOpCache(t *testing.T, sb integration.Sandbox, mode string) {
+ 	t.Helper()
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureDirectPush, integration.FeatureMergeDiff)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureDirectPush)
+ 	requiresLinux(t)
+ 
+ 	cdAddress := sb.ContainerdAddress()
 diff --git upstream/v0.11/client/llb/definition.go origin/v0.11/client/llb/definition.go
 index f92ee2d..d6dda89 100644
 --- upstream/v0.11/client/llb/definition.go
@@ -520,11 +764,55 @@ index f92ee2d..d6dda89 100644
  			}
  			existingIndexes := d.inputCache[input.Digest]
  			indexDiff := int(input.Index) - len(existingIndexes)
+diff --git upstream/v0.11/client/mergediff_test.go origin/v0.11/client/mergediff_test.go
+index b7fc957..61fdc9b 100644
+--- upstream/v0.11/client/mergediff_test.go
++++ origin/v0.11/client/mergediff_test.go
+@@ -1187,7 +1187,6 @@ func (tc verifyContents) Name() string {
+ }
+ 
+ func (tc verifyContents) Run(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureMergeDiff)
+ 	if tc.skipOnRootless && sb.Rootless() {
+ 		t.Skip("rootless")
+ 	}
 diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
-index ed49f9c..82f829c 100644
+index 2ebcd9a..82f829c 100644
 --- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
 +++ origin/v0.11/frontend/dockerfile/dockerfile_test.go
-@@ -6557,7 +6557,7 @@ FROM scratch
+@@ -419,7 +419,7 @@ RUN [ "$(cat testfile)" == "contents0" ]
+ }
+ 
+ func testExportCacheLoop(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport, integration.FeatureCacheImport, integration.FeatureCacheBackendLocal)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	f := getFrontend(t, sb)
+ 
+ 	dockerfile := []byte(`
+@@ -3948,12 +3948,7 @@ ONBUILD RUN mkdir -p /out && echo -n 11 >> /out/foo
+ }
+ 
+ func testCacheMultiPlatformImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureDirectPush,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheBackendInline,
+-		integration.FeatureCacheBackendRegistry,
+-	)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureDirectPush)
+ 	f := getFrontend(t, sb)
+ 
+ 	registry, err := sb.NewRegistry()
+@@ -4076,7 +4071,7 @@ COPY --from=base arch /
+ }
+ 
+ func testCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport, integration.FeatureCacheBackendLocal)
++	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+ 	f := getFrontend(t, sb)
+ 
+ 	registry, err := sb.NewRegistry()
+@@ -6562,7 +6557,7 @@ FROM scratch
  COPY --from=0 / /
  `)
  
@@ -533,4 +821,155 @@ index ed49f9c..82f829c 100644
  
  	dir, err := integration.Tmpdir(
  		t,
+diff --git upstream/v0.11/hack/test origin/v0.11/hack/test
+index 7b2ffa3..929733d 100755
+--- upstream/v0.11/hack/test
++++ origin/v0.11/hack/test
+@@ -72,7 +72,7 @@ if ! docker container inspect "$cacheVolume" >/dev/null 2>/dev/null; then
+ fi
+ 
+ if [ "$TEST_INTEGRATION" == 1 ]; then
+-  cid=$(docker create --rm -v /tmp $coverageVol --volumes-from=$cacheVolume -e TEST_DOCKERD -e SKIP_INTEGRATION_TESTS -e BUILDKIT_TEST_ENABLE_FEATURES -e BUILDKIT_TEST_DISABLE_FEATURES ${BUILDKIT_INTEGRATION_SNAPSHOTTER:+"-eBUILDKIT_INTEGRATION_SNAPSHOTTER"} -e BUILDKIT_REGISTRY_MIRROR_DIR=/root/.cache/registry --privileged $iid go test $coverageFlags ${TESTFLAGS:--v} ${TESTPKGS:-./...})
++  cid=$(docker create --rm -v /tmp $coverageVol --volumes-from=$cacheVolume -e TEST_DOCKERD -e SKIP_INTEGRATION_TESTS ${BUILDKIT_INTEGRATION_SNAPSHOTTER:+"-eBUILDKIT_INTEGRATION_SNAPSHOTTER"} -e BUILDKIT_REGISTRY_MIRROR_DIR=/root/.cache/registry --privileged $iid go test $coverageFlags ${TESTFLAGS:--v} ${TESTPKGS:-./...})
+   if [ "$TEST_DOCKERD" = "1" ]; then
+     docker cp "$TEST_DOCKERD_BINARY" $cid:/usr/bin/dockerd
+   fi
+@@ -112,7 +112,7 @@ if [ "$TEST_DOCKERFILE" == 1 ]; then
+ 
+     if [ -s $tarout ]; then
+       if [ "$release" = "mainline" ] || [ "$release" = "labs" ] || [ -n "$DOCKERFILE_RELEASES_CUSTOM" ] || [ "$GITHUB_ACTIONS" = "true" ]; then
+-        cid=$(docker create -v /tmp $coverageVol --rm --privileged --volumes-from=$cacheVolume -e TEST_DOCKERD -e BUILDKIT_TEST_ENABLE_FEATURES -e BUILDKIT_TEST_DISABLE_FEATURES -e BUILDKIT_REGISTRY_MIRROR_DIR=/root/.cache/registry -e BUILDKIT_WORKER_RANDOM -e FRONTEND_GATEWAY_ONLY=local:/$release.tar -e EXTERNAL_DF_FRONTEND=/dockerfile-frontend $iid go test $coverageFlags --count=1 -tags "$buildtags" ${TESTFLAGS:--v} ./frontend/dockerfile)
++        cid=$(docker create -v /tmp $coverageVol --rm --privileged --volumes-from=$cacheVolume -e TEST_DOCKERD -e BUILDKIT_REGISTRY_MIRROR_DIR=/root/.cache/registry -e BUILDKIT_WORKER_RANDOM -e FRONTEND_GATEWAY_ONLY=local:/$release.tar -e EXTERNAL_DF_FRONTEND=/dockerfile-frontend $iid go test $coverageFlags --count=1 -tags "$buildtags" ${TESTFLAGS:--v} ./frontend/dockerfile)
+         docker cp $tarout $cid:/$release.tar
+         if [ "$TEST_DOCKERD" = "1" ]; then
+           docker cp "$TEST_DOCKERD_BINARY" $cid:/usr/bin/dockerd
+diff --git upstream/v0.11/util/testutil/integration/dockerd.go origin/v0.11/util/testutil/integration/dockerd.go
+index a692986..b56390e 100644
+--- upstream/v0.11/util/testutil/integration/dockerd.go
++++ origin/v0.11/util/testutil/integration/dockerd.go
+@@ -25,11 +25,6 @@ func InitDockerdWorker() {
+ 		unsupported: []string{
+ 			FeatureCacheExport,
+ 			FeatureCacheImport,
+-			FeatureCacheBackendAzblob,
+-			FeatureCacheBackendGha,
+-			FeatureCacheBackendLocal,
+-			FeatureCacheBackendRegistry,
+-			FeatureCacheBackendS3,
+ 			FeatureDirectPush,
+ 			FeatureImageExporter,
+ 			FeatureMultiCacheExport,
+diff --git upstream/v0.11/util/testutil/integration/sandbox.go origin/v0.11/util/testutil/integration/sandbox.go
+index 1289bb5..8eb90cd 100644
+--- upstream/v0.11/util/testutil/integration/sandbox.go
++++ origin/v0.11/util/testutil/integration/sandbox.go
+@@ -46,20 +46,6 @@ func (b backend) Snapshotter() string {
+ }
+ 
+ func (b backend) isUnsupportedFeature(feature string) bool {
+-	if enabledFeatures := os.Getenv("BUILDKIT_TEST_ENABLE_FEATURES"); enabledFeatures != "" {
+-		for _, enabledFeature := range strings.Split(enabledFeatures, ",") {
+-			if feature == enabledFeature {
+-				return false
+-			}
+-		}
+-	}
+-	if disabledFeatures := os.Getenv("BUILDKIT_TEST_DISABLE_FEATURES"); disabledFeatures != "" {
+-		for _, disabledFeature := range strings.Split(disabledFeatures, ",") {
+-			if feature == disabledFeature {
+-				return true
+-			}
+-		}
+-	}
+ 	for _, unsupportedFeature := range b.unsupportedFeatures {
+ 		if feature == unsupportedFeature {
+ 			return true
+@@ -280,55 +266,41 @@ func printLogs(logs map[string]*bytes.Buffer, f func(args ...interface{})) {
+ }
+ 
+ const (
+-	FeatureCacheExport          = "cache_export"
+-	FeatureCacheImport          = "cache_import"
+-	FeatureCacheBackendAzblob   = "cache_backend_azblob"
+-	FeatureCacheBackendGha      = "cache_backend_gha"
+-	FeatureCacheBackendInline   = "cache_backend_inline"
+-	FeatureCacheBackendLocal    = "cache_backend_local"
+-	FeatureCacheBackendRegistry = "cache_backend_registry"
+-	FeatureCacheBackendS3       = "cache_backend_s3"
+-	FeatureDirectPush           = "direct_push"
+-	FeatureFrontendOutline      = "frontend_outline"
+-	FeatureFrontendTargets      = "frontend_targets"
+-	FeatureImageExporter        = "image_exporter"
+-	FeatureInfo                 = "info"
+-	FeatureMergeDiff            = "merge_diff"
+-	FeatureMultiCacheExport     = "multi_cache_export"
+-	FeatureMultiPlatform        = "multi_platform"
+-	FeatureOCIExporter          = "oci_exporter"
+-	FeatureOCILayout            = "oci_layout"
+-	FeatureProvenance           = "provenance"
+-	FeatureSBOM                 = "sbom"
+-	FeatureSecurityMode         = "security_mode"
+-	FeatureSourceDateEpoch      = "source_date_epoch"
+-	FeatureCNINetwork           = "cni_network"
++	FeatureCacheExport      = "cache export"
++	FeatureCacheImport      = "cache import"
++	FeatureDirectPush       = "direct push"
++	FeatureFrontendOutline  = "frontend outline"
++	FeatureFrontendTargets  = "frontend targets"
++	FeatureImageExporter    = "image exporter"
++	FeatureInfo             = "info"
++	FeatureMultiCacheExport = "multi cache export"
++	FeatureMultiPlatform    = "multi-platform"
++	FeatureOCIExporter      = "oci exporter"
++	FeatureOCILayout        = "oci layout"
++	FeatureProvenance       = "provenance"
++	FeatureSBOM             = "sbom"
++	FeatureSecurityMode     = "security mode"
++	FeatureSourceDateEpoch  = "source date epoch"
++	FeatureCNINetwork       = "cni network"
+ )
+ 
+ var features = map[string]struct{}{
+-	FeatureCacheExport:          {},
+-	FeatureCacheImport:          {},
+-	FeatureCacheBackendAzblob:   {},
+-	FeatureCacheBackendGha:      {},
+-	FeatureCacheBackendInline:   {},
+-	FeatureCacheBackendLocal:    {},
+-	FeatureCacheBackendRegistry: {},
+-	FeatureCacheBackendS3:       {},
+-	FeatureDirectPush:           {},
+-	FeatureFrontendOutline:      {},
+-	FeatureFrontendTargets:      {},
+-	FeatureImageExporter:        {},
+-	FeatureInfo:                 {},
+-	FeatureMergeDiff:            {},
+-	FeatureMultiCacheExport:     {},
+-	FeatureMultiPlatform:        {},
+-	FeatureOCIExporter:          {},
+-	FeatureOCILayout:            {},
+-	FeatureProvenance:           {},
+-	FeatureSBOM:                 {},
+-	FeatureSecurityMode:         {},
+-	FeatureSourceDateEpoch:      {},
+-	FeatureCNINetwork:           {},
++	FeatureCacheExport:      {},
++	FeatureCacheImport:      {},
++	FeatureDirectPush:       {},
++	FeatureFrontendOutline:  {},
++	FeatureFrontendTargets:  {},
++	FeatureImageExporter:    {},
++	FeatureInfo:             {},
++	FeatureMultiCacheExport: {},
++	FeatureMultiPlatform:    {},
++	FeatureOCIExporter:      {},
++	FeatureOCILayout:        {},
++	FeatureProvenance:       {},
++	FeatureSBOM:             {},
++	FeatureSecurityMode:     {},
++	FeatureSourceDateEpoch:  {},
++	FeatureCNINetwork:       {},
+ }
+ 
+ func CheckFeatureCompat(t *testing.T, sb Sandbox, reason ...string) {
 ```
