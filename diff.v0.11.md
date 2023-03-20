@@ -508,6 +508,39 @@ index 813fcdf..70ab905 100644
  
  install: FORCE
  	mkdir -p $(DESTDIR)$(bindir)
+diff --git upstream/v0.11/cache/refs.go origin/v0.11/cache/refs.go
+index 0af736a..dc2cd56 100644
+--- upstream/v0.11/cache/refs.go
++++ origin/v0.11/cache/refs.go
+@@ -14,7 +14,6 @@ import (
+ 	"github.com/containerd/containerd/images"
+ 	"github.com/containerd/containerd/leases"
+ 	"github.com/containerd/containerd/mount"
+-	"github.com/containerd/containerd/pkg/userns"
+ 	"github.com/containerd/containerd/snapshots"
+ 	"github.com/docker/docker/pkg/idtools"
+ 	"github.com/hashicorp/go-multierror"
+@@ -28,7 +27,6 @@ import (
+ 	"github.com/moby/buildkit/util/flightcontrol"
+ 	"github.com/moby/buildkit/util/leaseutil"
+ 	"github.com/moby/buildkit/util/progress"
+-	rootlessmountopts "github.com/moby/buildkit/util/rootless/mountopts"
+ 	"github.com/moby/buildkit/util/winlayers"
+ 	"github.com/moby/sys/mountinfo"
+ 	digest "github.com/opencontainers/go-digest"
+@@ -1642,12 +1640,6 @@ func (sm *sharableMountable) Mount() (_ []mount.Mount, _ func() error, retErr er
+ 				os.Remove(dir)
+ 			}
+ 		}()
+-		if userns.RunningInUserNS() {
+-			mounts, err = rootlessmountopts.FixUp(mounts)
+-			if err != nil {
+-				return nil, nil, err
+-			}
+-		}
+ 		if err := mount.All(mounts, dir); err != nil {
+ 			return nil, nil, err
+ 		}
 diff --git upstream/v0.11/client/build_test.go origin/v0.11/client/build_test.go
 index 75ebce6..1376c15 100644
 --- upstream/v0.11/client/build_test.go
@@ -776,6 +809,101 @@ index b7fc957..61fdc9b 100644
  	if tc.skipOnRootless && sb.Rootless() {
  		t.Skip("rootless")
  	}
+diff --git upstream/v0.11/docs/rootless.md origin/v0.11/docs/rootless.md
+index 2dabfbd..ee25875 100644
+--- upstream/v0.11/docs/rootless.md
++++ origin/v0.11/docs/rootless.md
+@@ -24,12 +24,6 @@ spec:
+ 
+ See also the [example manifests](#Kubernetes).
+ 
+-### Bottlerocket OS
+-
+-Needs to run `sysctl -w user.max_user_namespaces=N` (N=positive integer, like 63359) on the host nodes.
+-
+-See [`../examples/kubernetes/sysctl-userns.privileged.yaml`](../examples/kubernetes/sysctl-userns.privileged.yaml).
+-
+ <details>
+ <summary>Old distributions</summary>
+ 
+@@ -110,11 +104,6 @@ See https://rootlesscontaine.rs/getting-started/common/subuid/
+ ### Error `Options:[rbind ro]}]: operation not permitted`
+ Make sure to mount an `emptyDir` volume on `/home/user/.local/share/buildkit` .
+ 
+-### Error `fork/exec /proc/self/exe: no space left on device` with `level=warning msg="/proc/sys/user/max_user_namespaces needs to be set to non-zero."`
+-Run `sysctl -w user.max_user_namespaces=N` (N=positive integer, like 63359) on the host nodes.
+-
+-See [`../examples/kubernetes/sysctl-userns.privileged.yaml`](../examples/kubernetes/sysctl-userns.privileged.yaml).
+-
+ ## Containerized deployment
+ 
+ ### Kubernetes
+diff --git upstream/v0.11/examples/kubernetes/sysctl-userns.privileged.yaml origin/v0.11/examples/kubernetes/sysctl-userns.privileged.yaml
+deleted file mode 100644
+index 1380788..0000000
+--- upstream/v0.11/examples/kubernetes/sysctl-userns.privileged.yaml
++++ /dev/null
+@@ -1,26 +0,0 @@
+-# Run `sysctl -w user.max_user_namespaces=63359` on all the nodes,
+-# for errors like "/proc/sys/user/max_user_namespaces needs to be set to non-zero"
+-# on running rootless buildkitd pods.
+-#
+-# This workaround is known to be needed on Bottlerocket OS.
+-apiVersion: apps/v1
+-kind: DaemonSet
+-metadata:
+-  labels:
+-    app: sysctl-userns
+-  name: sysctl-userns
+-spec:
+-  selector:
+-    matchLabels:
+-      app: sysctl-userns
+-  template:
+-    metadata:
+-      labels:
+-        app: sysctl-userns
+-    spec:
+-      containers:
+-        - name: sysctl-userns
+-          image: busybox
+-          command: ["sh", "-euxc", "sysctl -w user.max_user_namespaces=63359 && sleep infinity"]
+-          securityContext:
+-            privileged: true
+diff --git upstream/v0.11/executor/oci/spec.go origin/v0.11/executor/oci/spec.go
+index f825b1d..94b48a7 100644
+--- upstream/v0.11/executor/oci/spec.go
++++ origin/v0.11/executor/oci/spec.go
+@@ -11,14 +11,12 @@ import (
+ 	"github.com/containerd/containerd/mount"
+ 	"github.com/containerd/containerd/namespaces"
+ 	"github.com/containerd/containerd/oci"
+-	"github.com/containerd/containerd/pkg/userns"
+ 	"github.com/containerd/continuity/fs"
+ 	"github.com/docker/docker/pkg/idtools"
+ 	"github.com/mitchellh/hashstructure/v2"
+ 	"github.com/moby/buildkit/executor"
+ 	"github.com/moby/buildkit/snapshot"
+ 	"github.com/moby/buildkit/util/network"
+-	rootlessmountopts "github.com/moby/buildkit/util/rootless/mountopts"
+ 	traceexec "github.com/moby/buildkit/util/tracing/exec"
+ 	specs "github.com/opencontainers/runtime-spec/specs-go"
+ 	"github.com/opencontainers/selinux/go-selinux"
+@@ -194,14 +192,6 @@ func GenerateSpec(ctx context.Context, meta executor.Meta, mounts []executor.Mou
+ 	}
+ 
+ 	s.Mounts = dedupMounts(s.Mounts)
+-
+-	if userns.RunningInUserNS() {
+-		s.Mounts, err = rootlessmountopts.FixUpOCI(s.Mounts)
+-		if err != nil {
+-			return nil, nil, err
+-		}
+-	}
+-
+ 	return s, releaseAll, nil
+ }
+ 
 diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
 index 2ebcd9a..82f829c 100644
 --- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
@@ -843,6 +971,191 @@ index 7b2ffa3..929733d 100755
          docker cp $tarout $cid:/$release.tar
          if [ "$TEST_DOCKERD" = "1" ]; then
            docker cp "$TEST_DOCKERD_BINARY" $cid:/usr/bin/dockerd
+diff --git upstream/v0.11/snapshot/localmounter_unix.go origin/v0.11/snapshot/localmounter_unix.go
+index a4b7b1a..27cff3e 100644
+--- upstream/v0.11/snapshot/localmounter_unix.go
++++ origin/v0.11/snapshot/localmounter_unix.go
+@@ -8,8 +8,6 @@ import (
+ 	"syscall"
+ 
+ 	"github.com/containerd/containerd/mount"
+-	"github.com/containerd/containerd/pkg/userns"
+-	rootlessmountopts "github.com/moby/buildkit/util/rootless/mountopts"
+ 	"github.com/pkg/errors"
+ )
+ 
+@@ -26,14 +24,6 @@ func (lm *localMounter) Mount() (string, error) {
+ 		lm.release = release
+ 	}
+ 
+-	if userns.RunningInUserNS() {
+-		var err error
+-		lm.mounts, err = rootlessmountopts.FixUp(lm.mounts)
+-		if err != nil {
+-			return "", err
+-		}
+-	}
+-
+ 	if len(lm.mounts) == 1 && (lm.mounts[0].Type == "bind" || lm.mounts[0].Type == "rbind") {
+ 		ro := false
+ 		for _, opt := range lm.mounts[0].Options {
+diff --git upstream/v0.11/util/rootless/mountopts/mountopts_linux.go origin/v0.11/util/rootless/mountopts/mountopts_linux.go
+deleted file mode 100644
+index 92c542b..0000000
+--- upstream/v0.11/util/rootless/mountopts/mountopts_linux.go
++++ /dev/null
+@@ -1,88 +0,0 @@
+-package mountopts
+-
+-import (
+-	"github.com/containerd/containerd/mount"
+-	"github.com/moby/buildkit/util/strutil"
+-	specs "github.com/opencontainers/runtime-spec/specs-go"
+-	"github.com/pkg/errors"
+-	"golang.org/x/sys/unix"
+-)
+-
+-// UnprivilegedMountFlags gets the set of mount flags that are set on the mount that contains the given
+-// path and are locked by CL_UNPRIVILEGED. This is necessary to ensure that
+-// bind-mounting "with options" will not fail with user namespaces, due to
+-// kernel restrictions that require user namespace mounts to preserve
+-// CL_UNPRIVILEGED locked flags.
+-//
+-// From https://github.com/moby/moby/blob/v23.0.1/daemon/oci_linux.go#L430-L460
+-func UnprivilegedMountFlags(path string) ([]string, error) {
+-	var statfs unix.Statfs_t
+-	if err := unix.Statfs(path, &statfs); err != nil {
+-		return nil, err
+-	}
+-
+-	// The set of keys come from https://github.com/torvalds/linux/blob/v4.13/fs/namespace.c#L1034-L1048.
+-	unprivilegedFlags := map[uint64]string{
+-		unix.MS_RDONLY:     "ro",
+-		unix.MS_NODEV:      "nodev",
+-		unix.MS_NOEXEC:     "noexec",
+-		unix.MS_NOSUID:     "nosuid",
+-		unix.MS_NOATIME:    "noatime",
+-		unix.MS_RELATIME:   "relatime",
+-		unix.MS_NODIRATIME: "nodiratime",
+-	}
+-
+-	var flags []string
+-	for mask, flag := range unprivilegedFlags {
+-		if uint64(statfs.Flags)&mask == mask {
+-			flags = append(flags, flag)
+-		}
+-	}
+-
+-	return flags, nil
+-}
+-
+-// FixUp is for https://github.com/moby/buildkit/issues/3098
+-func FixUp(mounts []mount.Mount) ([]mount.Mount, error) {
+-	for i, m := range mounts {
+-		var isBind bool
+-		for _, o := range m.Options {
+-			switch o {
+-			case "bind", "rbind":
+-				isBind = true
+-			}
+-		}
+-		if !isBind {
+-			continue
+-		}
+-		unpriv, err := UnprivilegedMountFlags(m.Source)
+-		if err != nil {
+-			return nil, errors.Wrapf(err, "failed to get unprivileged mount flags for %+v", m)
+-		}
+-		m.Options = strutil.DedupeSlice(append(m.Options, unpriv...))
+-		mounts[i] = m
+-	}
+-	return mounts, nil
+-}
+-
+-func FixUpOCI(mounts []specs.Mount) ([]specs.Mount, error) {
+-	for i, m := range mounts {
+-		var isBind bool
+-		for _, o := range m.Options {
+-			switch o {
+-			case "bind", "rbind":
+-				isBind = true
+-			}
+-		}
+-		if !isBind {
+-			continue
+-		}
+-		unpriv, err := UnprivilegedMountFlags(m.Source)
+-		if err != nil {
+-			return nil, errors.Wrapf(err, "failed to get unprivileged mount flags for %+v", m)
+-		}
+-		m.Options = strutil.DedupeSlice(append(m.Options, unpriv...))
+-		mounts[i] = m
+-	}
+-	return mounts, nil
+-}
+diff --git upstream/v0.11/util/rootless/mountopts/mountopts_others.go origin/v0.11/util/rootless/mountopts/mountopts_others.go
+deleted file mode 100644
+index 956c804..0000000
+--- upstream/v0.11/util/rootless/mountopts/mountopts_others.go
++++ /dev/null
+@@ -1,21 +0,0 @@
+-//go:build !linux
+-// +build !linux
+-
+-package mountopts
+-
+-import (
+-	"github.com/containerd/containerd/mount"
+-	specs "github.com/opencontainers/runtime-spec/specs-go"
+-)
+-
+-func UnprivilegedMountFlags(path string) ([]string, error) {
+-	return []string{}, nil
+-}
+-
+-func FixUp(mounts []mount.Mount) ([]mount.Mount, error) {
+-	return mounts, nil
+-}
+-
+-func FixUpOCI(mounts []specs.Mount) ([]specs.Mount, error) {
+-	return mounts, nil
+-}
+diff --git upstream/v0.11/util/strutil/strutil.go origin/v0.11/util/strutil/strutil.go
+deleted file mode 100644
+index cb98555..0000000
+--- upstream/v0.11/util/strutil/strutil.go
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+-   Copyright The containerd Authors.
+-
+-   Licensed under the Apache License, Version 2.0 (the "License");
+-   you may not use this file except in compliance with the License.
+-   You may obtain a copy of the License at
+-
+-       http://www.apache.org/licenses/LICENSE-2.0
+-
+-   Unless required by applicable law or agreed to in writing, software
+-   distributed under the License is distributed on an "AS IS" BASIS,
+-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-   See the License for the specific language governing permissions and
+-   limitations under the License.
+-*/
+-
+-package strutil
+-
+-// DedupeSlice is from https://github.com/containerd/nerdctl/blob/v1.2.1/pkg/strutil/strutil.go#L72-L82
+-func DedupeSlice(in []string) []string {
+-	m := make(map[string]struct{})
+-	var res []string
+-	for _, s := range in {
+-		if _, ok := m[s]; !ok {
+-			res = append(res, s)
+-			m[s] = struct{}{}
+-		}
+-	}
+-	return res
+-}
 diff --git upstream/v0.11/util/testutil/integration/dockerd.go origin/v0.11/util/testutil/integration/dockerd.go
 index a692986..b56390e 100644
 --- upstream/v0.11/util/testutil/integration/dockerd.go
