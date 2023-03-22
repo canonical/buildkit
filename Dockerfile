@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile-upstream:master
 
-ARG RUNC_VERSION=v1.1.4
+ARG RUNC_VERSION=1.1.4-0ubuntu1~20.04.1
 ARG CONTAINERD_VERSION=v1.6.18
 # containerd v1.5 for integration tests
 ARG CONTAINERD_ALT_VERSION_15=v1.5.18
@@ -46,21 +46,21 @@ FROM golatest AS gobuild-base
 COPY --link --from=xx / /
 
 # runc source
-FROM git AS runc-src
-ARG RUNC_VERSION
-WORKDIR /usr/src
-RUN git clone https://github.com/opencontainers/runc.git runc \
-  && cd runc && git checkout -q "$RUNC_VERSION"
+#FROM git AS runc-src
+#ARG RUNC_VERSION
+#WORKDIR /usr/src
+#RUN git clone https://github.com/opencontainers/runc.git runc \
+#  && cd runc && git checkout -q "$RUNC_VERSION"
 
 # build runc binary
-FROM gobuild-base AS runc
-WORKDIR $GOPATH/src/github.com/opencontainers/runc
-ARG TARGETPLATFORM
-# gcc is only installed for libgcc
-RUN set -e; xx-apt install -y libseccomp-dev dpkg-dev gcc
-RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
-  CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
-  xx-verify --static /usr/bin/runc
+#FROM gobuild-base AS runc
+#WORKDIR $GOPATH/src/github.com/opencontainers/runc
+#ARG TARGETPLATFORM
+## gcc is only installed for libgcc
+#RUN set -e; xx-apt install -y libseccomp-dev dpkg-dev gcc
+#RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
+#  CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
+#  xx-verify --static /usr/bin/runc
 
 # dnsname CNI plugin for testing
 FROM gobuild-base AS dnsname
@@ -105,7 +105,7 @@ RUN --mount=target=. --mount=target=/root/.cache,type=cache \
   xx-verify --static /usr/bin/buildkitd
 
 FROM scratch AS binaries-linux-helper
-COPY --link --from=runc /usr/bin/runc /buildkit-runc
+#COPY --link --from=runc /usr/bin/runc /buildkit-runc
 # built from https://github.com/tonistiigi/binfmt/releases/tag/buildkit%2Fv7.1.0-30
 COPY --link --from=tonistiigi/binfmt:buildkit-v7.1.0-30@sha256:45dd57b4ba2f24e2354f71f1e4e51f073cb7a28fd848ce6f5f2a7701142a6bf0 / /
 
@@ -135,7 +135,8 @@ FROM scratch AS release
 COPY --link --from=releaser /out/ /
 
 FROM ubuntubase AS buildkit-export
-RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils \
+ARG RUNC_VERSION
+RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils runc=${RUNC_VERSION}\
   && rm -rf /var/lib/apt/lists/*
 COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
 VOLUME /var/lib/buildkit
@@ -227,7 +228,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
 FROM buildkit-base AS integration-tests-base
 ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
 ARG NERDCTL_VERSION
-RUN xx-apt install -y sudo uidmap vim iptables dnsmasq fuse curl \
+# Installing runc from the archives in here, cause for Jammy it is also v1.1.4
+# Also installing rootlesskit from the archives
+RUN xx-apt install -y sudo uidmap vim iptables dnsmasq fuse curl runc=1.1.4-0ubuntu1~22.04.1 rootlesskit \
   && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
   && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
   && mkdir -m 0700 -p /run/user/1000 \
@@ -246,10 +249,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
 ENV CGO_ENABLED=0
 COPY --link --from=nydus /out/nydus-static/* /usr/bin/
 COPY --link --from=stargz-snapshotter /out/* /usr/bin/
-COPY --link --from=rootlesskit /rootlesskit /usr/bin/
+#COPY --link --from=rootlesskit /rootlesskit /usr/bin/
 COPY --link --from=containerd-alt-15 /out/containerd* /opt/containerd-alt-15/bin/
 COPY --link --from=registry /bin/registry /usr/bin/
-COPY --link --from=runc /usr/bin/runc /usr/bin/
+#COPY --link --from=runc /usr/bin/runc /usr/bin/
 COPY --link --from=containerd /out/containerd* /usr/bin/
 COPY --link --from=cni-plugins /opt/cni/bin/bridge /opt/cni/bin/host-local /opt/cni/bin/loopback /opt/cni/bin/firewall /opt/cni/bin/dnsname /opt/cni/bin/
 COPY --link hack/fixtures/cni.json /etc/buildkit/cni.json
@@ -274,6 +277,8 @@ RUN adduser --disabled-password --gecos "" -uid 1000 user \
   && chown -R user /run/user/1000 /home/user \
   && echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid
 COPY --link --from=rootlesskit /rootlesskit /usr/bin/
+# Let's install rootlesskit from the Jammy backport PPA
+
 COPY --link --from=binaries / /usr/bin/
 COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
 # Kubernetes runAsNonRoot requires USER to be numeric
