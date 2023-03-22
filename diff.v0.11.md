@@ -347,15 +347,24 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index b64f57b..1203eca 100644
+index b64f57b..939af14 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
-@@ -12,31 +12,37 @@ ARG NERDCTL_VERSION=v1.0.0
+@@ -1,6 +1,6 @@
+ # syntax=docker/dockerfile-upstream:master
+ 
+-ARG RUNC_VERSION=v1.1.4
++ARG RUNC_VERSION=1.1.4-0ubuntu1~20.04.1
+ ARG CONTAINERD_VERSION=v1.6.18
+ # containerd v1.5 for integration tests
+ ARG CONTAINERD_ALT_VERSION_15=v1.5.18
+@@ -12,51 +12,55 @@ ARG NERDCTL_VERSION=v1.0.0
  ARG DNSNAME_VERSION=v1.3.1
  ARG NYDUS_VERSION=v2.1.0
  
 -ARG ALPINE_VERSION=3.17
--
++ARG UBUNTU_VERSION=20.04
+ 
 -# alpine base for buildkit image
 -# TODO: remove this when alpine image supports riscv64
 -FROM alpine:${ALPINE_VERSION} AS alpine-amd64
@@ -365,8 +374,6 @@ index b64f57b..1203eca 100644
 -FROM alpine:${ALPINE_VERSION} AS alpine-ppc64le
 -FROM alpine:edge@sha256:c223f84e05c23c0571ce8decefef818864869187e1a3ea47719412e205c8c64e AS alpine-riscv64
 -FROM alpine-$TARGETARCH AS alpinebase
-+ARG UBUNTU_VERSION=20.04
-+
 +# ubuntu base for buildkit image
 +# TODO: remove this when ubuntu image supports riscv64 again
 +FROM amd64/ubuntu:${UBUNTU_VERSION} AS ubuntu-amd64
@@ -403,17 +410,39 @@ index b64f57b..1203eca 100644
  COPY --link --from=xx / /
  
  # runc source
-@@ -51,9 +57,7 @@ FROM gobuild-base AS runc
- WORKDIR $GOPATH/src/github.com/opencontainers/runc
- ARG TARGETPLATFORM
- # gcc is only installed for libgcc
+-FROM git AS runc-src
+-ARG RUNC_VERSION
+-WORKDIR /usr/src
+-RUN git clone https://github.com/opencontainers/runc.git runc \
+-  && cd runc && git checkout -q "$RUNC_VERSION"
++#FROM git AS runc-src
++#ARG RUNC_VERSION
++#WORKDIR /usr/src
++#RUN git clone https://github.com/opencontainers/runc.git runc \
++#  && cd runc && git checkout -q "$RUNC_VERSION"
+ 
+ # build runc binary
+-FROM gobuild-base AS runc
+-WORKDIR $GOPATH/src/github.com/opencontainers/runc
+-ARG TARGETPLATFORM
+-# gcc is only installed for libgcc
 -# lld has issues building static binaries for ppc so prefer ld for it
 -RUN set -e; xx-apk add musl-dev gcc libseccomp-dev libseccomp-static; \
 -  [ "$(xx-info arch)" != "ppc64le" ] || XX_CC_PREFER_LINKER=ld xx-clang --setup-target-triple
-+RUN set -e; xx-apt install -y libseccomp-dev dpkg-dev gcc
- RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
-   CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
-   xx-verify --static /usr/bin/runc
+-RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
+-  CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
+-  xx-verify --static /usr/bin/runc
++#FROM gobuild-base AS runc
++#WORKDIR $GOPATH/src/github.com/opencontainers/runc
++#ARG TARGETPLATFORM
++## gcc is only installed for libgcc
++#RUN set -e; xx-apt install -y libseccomp-dev dpkg-dev gcc
++#RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
++#  CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ && \
++#  xx-verify --static /usr/bin/runc
+ 
+ # dnsname CNI plugin for testing
+ FROM gobuild-base AS dnsname
 @@ -75,7 +79,7 @@ ENV GOFLAGS=-mod=vendor
  FROM buildkit-base AS buildkit-version
  # TODO: PKG should be inferred from go modules
@@ -422,6 +451,15 @@ index b64f57b..1203eca 100644
 +  PKG=github.com/canonical/buildkit VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always --tags) REVISION=$(git rev-parse HEAD)$(if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi); \
    echo "-X ${PKG}/version.Version=${VERSION} -X ${PKG}/version.Revision=${REVISION} -X ${PKG}/version.Package=${PKG}" | tee /tmp/.ldflags; \
    echo -n "${VERSION}" | tee /tmp/.version;
+ 
+@@ -101,7 +105,7 @@ RUN --mount=target=. --mount=target=/root/.cache,type=cache \
+   xx-verify --static /usr/bin/buildkitd
+ 
+ FROM scratch AS binaries-linux-helper
+-COPY --link --from=runc /usr/bin/runc /buildkit-runc
++#COPY --link --from=runc /usr/bin/runc /buildkit-runc
+ # built from https://github.com/tonistiigi/binfmt/releases/tag/buildkit%2Fv7.1.0-30
+ COPY --link --from=tonistiigi/binfmt:buildkit-v7.1.0-30@sha256:45dd57b4ba2f24e2354f71f1e4e51f073cb7a28fd848ce6f5f2a7701142a6bf0 / /
  
 @@ -119,8 +123,8 @@ FROM binaries-$TARGETOS AS binaries
  # enable scanning for this stage
@@ -434,7 +472,7 @@ index b64f57b..1203eca 100644
  WORKDIR /work
  ARG TARGETPLATFORM
  RUN --mount=from=binaries \
-@@ -130,9 +134,9 @@ RUN --mount=from=binaries \
+@@ -130,9 +134,10 @@ RUN --mount=from=binaries \
  FROM scratch AS release
  COPY --link --from=releaser /out/ /
  
@@ -442,12 +480,13 @@ index b64f57b..1203eca 100644
 -RUN apk add --no-cache fuse3 git openssh pigz xz \
 -  && ln -s fusermount3 /usr/bin/fusermount
 +FROM ubuntubase AS buildkit-export
-+RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils \
++ARG RUNC_VERSION
++RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils runc=${RUNC_VERSION}\
 +  && rm -rf /var/lib/apt/lists/*
  COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
  VOLUME /var/lib/buildkit
  
-@@ -146,7 +150,7 @@ FROM gobuild-base AS containerd-base
+@@ -146,7 +151,7 @@ FROM gobuild-base AS containerd-base
  WORKDIR /go/src/github.com/containerd/containerd
  ARG TARGETPLATFORM
  ENV CGO_ENABLED=1 BUILDTAGS=no_btrfs GO111MODULE=off
@@ -456,7 +495,7 @@ index b64f57b..1203eca 100644
  
  FROM containerd-base AS containerd
  ARG CONTAINERD_VERSION
-@@ -211,8 +215,8 @@ FROM binaries AS buildkit-windows
+@@ -211,8 +216,8 @@ FROM binaries AS buildkit-windows
  # this is not in binaries-windows because it is not intended for release yet, just CI
  COPY --link --from=buildkitd /usr/bin/buildkitd /buildkitd.exe
  
@@ -467,16 +506,31 @@ index b64f57b..1203eca 100644
  ARG CNI_VERSION
  ARG TARGETOS
  ARG TARGETARCH
-@@ -223,7 +227,7 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
+@@ -223,7 +228,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
  FROM buildkit-base AS integration-tests-base
  ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
  ARG NERDCTL_VERSION
 -RUN apk add --no-cache shadow shadow-uidmap sudo vim iptables ip6tables dnsmasq fuse curl git-daemon \
-+RUN xx-apt install -y sudo uidmap vim iptables dnsmasq fuse curl \
++# Installing runc from the archives in here, cause for Jammy it is also v1.1.4
++# Also installing rootlesskit from the archives
++RUN xx-apt install -y sudo uidmap vim iptables dnsmasq fuse curl runc=1.1.4-0ubuntu1~22.04.1 rootlesskit \
    && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
    && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
    && mkdir -m 0700 -p /run/user/1000 \
-@@ -261,9 +265,11 @@ FROM integration-tests AS dev-env
+@@ -242,10 +249,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
+ ENV CGO_ENABLED=0
+ COPY --link --from=nydus /out/nydus-static/* /usr/bin/
+ COPY --link --from=stargz-snapshotter /out/* /usr/bin/
+-COPY --link --from=rootlesskit /rootlesskit /usr/bin/
++#COPY --link --from=rootlesskit /rootlesskit /usr/bin/
+ COPY --link --from=containerd-alt-15 /out/containerd* /opt/containerd-alt-15/bin/
+ COPY --link --from=registry /bin/registry /usr/bin/
+-COPY --link --from=runc /usr/bin/runc /usr/bin/
++#COPY --link --from=runc /usr/bin/runc /usr/bin/
+ COPY --link --from=containerd /out/containerd* /usr/bin/
+ COPY --link --from=cni-plugins /opt/cni/bin/bridge /opt/cni/bin/host-local /opt/cni/bin/loopback /opt/cni/bin/firewall /opt/cni/bin/dnsname /opt/cni/bin/
+ COPY --link hack/fixtures/cni.json /etc/buildkit/cni.json
+@@ -261,13 +268,17 @@ FROM integration-tests AS dev-env
  VOLUME /var/lib/buildkit
  
  # Rootless mode.
@@ -491,6 +545,12 @@ index b64f57b..1203eca 100644
    && mkdir -p /run/user/1000 /home/user/.local/tmp /home/user/.local/share/buildkit \
    && chown -R user /run/user/1000 /home/user \
    && echo user:100000:65536 | tee /etc/subuid | tee /etc/subgid
+ COPY --link --from=rootlesskit /rootlesskit /usr/bin/
++# Let's install rootlesskit from the Jammy backport PPA
++
+ COPY --link --from=binaries / /usr/bin/
+ COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
+ # Kubernetes runAsNonRoot requires USER to be numeric
 diff --git upstream/v0.11/Makefile origin/v0.11/Makefile
 index 813fcdf..70ab905 100644
 --- upstream/v0.11/Makefile
