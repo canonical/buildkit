@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..8170dd5 100644
+index 40d60dc..6e8ed02 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -22,8 +22,13 @@ on:
@@ -29,7 +29,12 @@ index 40d60dc..8170dd5 100644
            RUNC_PLATFORMS: ${{ env.PLATFORMS }}
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
            CACHE_TO: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
-@@ -383,12 +390,16 @@ jobs:
+@@ -379,12 +386,13 @@ jobs:
+           driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
+           buildkitd-flags: --debug
+       -
+-        name: Login to DockerHub
++        name: Login to GHCR
          if: needs.release-base.outputs.push == 'push'
          uses: docker/login-action@v2
          with:
@@ -41,14 +46,16 @@ index 40d60dc..8170dd5 100644
        -
          name: Build ${{ needs.release-base.outputs.tag }}
          run: |
-+          echo ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }} > artifactory_token
-+          echo ${{ secrets.ARTIFACTORY_URL }} > artifactory_url
-           ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" "${{ needs.release-base.outputs.push }}"
-+          rm artifactory_token artifactory_url
-         env:
-           RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
+@@ -394,6 +402,8 @@ jobs:
            TARGET: ${{ matrix.target-stage }}
-@@ -421,7 +432,9 @@ jobs:
+           CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}
+           CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
++          ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
++          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }} 
+ 
+   binaries:
+     runs-on: ubuntu-20.04
+@@ -421,7 +431,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -59,7 +66,7 @@ index 40d60dc..8170dd5 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -441,82 +454,83 @@ jobs:
+@@ -441,82 +453,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
@@ -354,7 +361,7 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index b64f57b..416638a 100644
+index b64f57b..5debdde 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
 @@ -1,62 +1,67 @@
@@ -517,13 +524,13 @@ index b64f57b..416638a 100644
 +WORKDIR /opt/utils
 +RUN apt install -y python3 python3-pip && \
 +  pip install -r requirements.txt
-+RUN --mount=type=secret,id=artifactory_token,dst=/etc/secrets/token \
-+  --mount=type=secret,id=artifactory_url,dst=/etc/secrets/url \
-+  ./fetch_from_artifactory.py --artifactory-url-file /etc/secrets/url \
-+  --artifact-path 'jammy-rootlesskit-backport/pool/r/rootlesskit/rootlesskit_${ROOTLESSKIT_VERSION}.orig.tar.gz' \
-+  --token-file /etc/secrets/token --output-file rootlesskit.tar.gz
-+# RUN git clone https://github.com/rootless-containers/rootlesskit.git /go/src/github.com/rootless-containers/rootlesskit
  WORKDIR /go/src/github.com/rootless-containers/rootlesskit
++RUN --mount=type=secret,id=ARTIFACTORY_ACCESS_TOKEN \
++  --mount=type=secret,id=ARTIFACTORY_URL \
++  /opt/utils/fetch_from_artifactory.py --artifactory-url-file /run/secrets/ARTIFACTORY_URL \
++  --artifact-path "jammy-rootlesskit-backport/pool/r/rootlesskit/rootlesskit_${ROOTLESSKIT_VERSION}.orig.tar.gz" \
++  --token-file /run/secrets/ARTIFACTORY_ACCESS_TOKEN --output-file rootlesskit.tar.gz
++# RUN git clone https://github.com/rootless-containers/rootlesskit.git /go/src/github.com/rootless-containers/rootlesskit
  ARG TARGETPLATFORM
  RUN  --mount=target=/root/.cache,type=cache \
 -  git checkout -q "$ROOTLESSKIT_VERSION"  && \
@@ -1641,6 +1648,31 @@ index 252617f..1b000a8 100644
  			}
  
  			if file := msg.GetFile(); file != nil {
+diff --git upstream/v0.11/hack/images origin/v0.11/hack/images
+index d1315e6..674a77b 100755
+--- upstream/v0.11/hack/images
++++ origin/v0.11/hack/images
+@@ -52,8 +52,13 @@ if [ -n "$localmode" ]; then
+ fi
+ 
+ targetFlag=""
++secrets=""
+ if [ -n "$TARGET" ]; then
+   targetFlag="--target=$TARGET"
++  if [[ "$TARGET" == "rootless" ]]
++  then
++    secrets="--secret id=ARTIFACTORY_ACCESS_TOKEN --secret id=ARTIFACTORY_URL"
++  fi
+ fi
+ 
+ tagNames="$REPO:$TAG"
+@@ -97,5 +102,5 @@ if [[ "$RELEASE" = "true" ]] && [[ "$GITHUB_ACTIONS" = "true" ]]; then
+   nocacheFilterFlag="--no-cache-filter=git,buildkit-export,gobuild-base"
+ fi
+ 
+-buildxCmd build $platformFlag $targetFlag $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
++buildxCmd build $platformFlag $targetFlag $secrets $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
+   $currentcontext
 diff --git upstream/v0.11/hack/test origin/v0.11/hack/test
 index 7b2ffa3..929733d 100755
 --- upstream/v0.11/hack/test
