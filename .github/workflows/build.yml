@@ -386,7 +386,7 @@ jobs:
           driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
           buildkitd-flags: --debug
       -
-        name: Login to DockerHub
+        name: Login to GHCR
         if: needs.release-base.outputs.push == 'push'
         uses: docker/login-action@v2
         with:
@@ -396,15 +396,14 @@ jobs:
       -
         name: Build ${{ needs.release-base.outputs.tag }}
         run: |
-          echo ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }} > artifactory_token
-          echo ${{ secrets.ARTIFACTORY_URL }} > artifactory_url
           ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" "${{ needs.release-base.outputs.push }}"
-          rm artifactory_token artifactory_url
         env:
           RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
           TARGET: ${{ matrix.target-stage }}
           CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}
           CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
+          ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }} 
 
   binaries:
     runs-on: ubuntu-20.04

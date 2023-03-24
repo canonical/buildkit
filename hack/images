@@ -52,8 +52,13 @@ if [ -n "$localmode" ]; then
 fi
 
 targetFlag=""
+secrets=""
 if [ -n "$TARGET" ]; then
   targetFlag="--target=$TARGET"
+  if [[ "$TARGET" == "rootless" ]]
+  then
+    secrets="--secret id=ARTIFACTORY_ACCESS_TOKEN --secret id=ARTIFACTORY_URL"
+  fi
 fi
 
 tagNames="$REPO:$TAG"
@@ -97,5 +102,5 @@ if [[ "$RELEASE" = "true" ]] && [[ "$GITHUB_ACTIONS" = "true" ]]; then
   nocacheFilterFlag="--no-cache-filter=git,buildkit-export,gobuild-base"
 fi
 
-buildxCmd build $platformFlag $targetFlag $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
+buildxCmd build $platformFlag $targetFlag $secrets $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
   $currentcontext

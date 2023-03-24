@@ -183,13 +183,13 @@ COPY canonical_utils/artifactory /opt/utils
 WORKDIR /opt/utils
 RUN apt install -y python3 python3-pip && \
   pip install -r requirements.txt
-RUN --mount=type=secret,id=artifactory_token,dst=/etc/secrets/token \
-  --mount=type=secret,id=artifactory_url,dst=/etc/secrets/url \
-  ./fetch_from_artifactory.py --artifactory-url-file /etc/secrets/url \
-  --artifact-path 'jammy-rootlesskit-backport/pool/r/rootlesskit/rootlesskit_${ROOTLESSKIT_VERSION}.orig.tar.gz' \
-  --token-file /etc/secrets/token --output-file rootlesskit.tar.gz
-# RUN git clone https://github.com/rootless-containers/rootlesskit.git /go/src/github.com/rootless-containers/rootlesskit
 WORKDIR /go/src/github.com/rootless-containers/rootlesskit
+RUN --mount=type=secret,id=ARTIFACTORY_ACCESS_TOKEN \
+  --mount=type=secret,id=ARTIFACTORY_URL \
+  /opt/utils/fetch_from_artifactory.py --artifactory-url-file /run/secrets/ARTIFACTORY_URL \
+  --artifact-path "jammy-rootlesskit-backport/pool/r/rootlesskit/rootlesskit_${ROOTLESSKIT_VERSION}.orig.tar.gz" \
+  --token-file /run/secrets/ARTIFACTORY_ACCESS_TOKEN --output-file rootlesskit.tar.gz
+# RUN git clone https://github.com/rootless-containers/rootlesskit.git /go/src/github.com/rootless-containers/rootlesskit
 ARG TARGETPLATFORM
 RUN  --mount=target=/root/.cache,type=cache \
   tar -xvf rootlesskit.tar.gz -C . --strip-components=1 && \
