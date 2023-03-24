@@ -602,10 +602,186 @@ index 0af736a..dc2cd56 100644
  			return nil, nil, err
  		}
 diff --git upstream/v0.11/client/build_test.go origin/v0.11/client/build_test.go
-index 75ebce6..1376c15 100644
+index 763207c..1376c15 100644
 --- upstream/v0.11/client/build_test.go
 +++ origin/v0.11/client/build_test.go
-@@ -1991,7 +1991,6 @@ func testClientGatewayContainerSignal(t *testing.T, sb integration.Sandbox) {
+@@ -45,9 +45,7 @@ func TestClientGatewayIntegration(t *testing.T) {
+ 		testClientGatewayContainerPID1Exit,
+ 		testClientGatewayContainerMounts,
+ 		testClientGatewayContainerPID1Tty,
+-		testClientGatewayContainerCancelPID1Tty,
+ 		testClientGatewayContainerExecTty,
+-		testClientGatewayContainerCancelExecTty,
+ 		testClientSlowCacheRootfsRef,
+ 		testClientGatewayContainerPlatformPATH,
+ 		testClientGatewayExecError,
+@@ -925,77 +923,6 @@ func testClientGatewayContainerPID1Tty(t *testing.T, sb integration.Sandbox) {
+ 	checkAllReleasable(t, c, sb, true)
+ }
+ 
+-// testClientGatewayContainerCancelPID1Tty is testing that the tty will cleanly
+-// shutdown on context cancel
+-func testClientGatewayContainerCancelPID1Tty(t *testing.T, sb integration.Sandbox) {
+-	requiresLinux(t)
+-	ctx := sb.Context()
+-
+-	c, err := New(ctx, sb.Address())
+-	require.NoError(t, err)
+-	defer c.Close()
+-
+-	product := "buildkit_test"
+-
+-	inputR, inputW := io.Pipe()
+-	output := bytes.NewBuffer(nil)
+-
+-	b := func(ctx context.Context, c client.Client) (*client.Result, error) {
+-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+-		defer cancel()
+-
+-		st := llb.Image("busybox:latest")
+-
+-		def, err := st.Marshal(ctx)
+-		if err != nil {
+-			return nil, errors.Wrap(err, "failed to marshal state")
+-		}
+-
+-		r, err := c.Solve(ctx, client.SolveRequest{
+-			Definition: def.ToPB(),
+-		})
+-		if err != nil {
+-			return nil, errors.Wrap(err, "failed to solve")
+-		}
+-
+-		ctr, err := c.NewContainer(ctx, client.NewContainerRequest{
+-			Mounts: []client.Mount{{
+-				Dest:      "/",
+-				MountType: pb.MountType_BIND,
+-				Ref:       r.Ref,
+-			}},
+-		})
+-		require.NoError(t, err)
+-		defer ctr.Release(ctx)
+-
+-		prompt := newTestPrompt(ctx, t, inputW, output)
+-		pid1, err := ctr.Start(ctx, client.StartRequest{
+-			Args:   []string{"sh"},
+-			Tty:    true,
+-			Stdin:  inputR,
+-			Stdout: &nopCloser{output},
+-			Stderr: &nopCloser{output},
+-			Env:    []string{fmt.Sprintf("PS1=%s", prompt.String())},
+-		})
+-		require.NoError(t, err)
+-		prompt.SendExpect("echo hi", "hi")
+-		cancel()
+-
+-		err = pid1.Wait()
+-		require.ErrorIs(t, err, context.Canceled)
+-
+-		return &client.Result{}, err
+-	}
+-
+-	_, err = c.Build(ctx, SolveOpt{}, product, b, nil)
+-	require.Error(t, err)
+-
+-	inputW.Close()
+-	inputR.Close()
+-
+-	checkAllReleasable(t, c, sb, true)
+-}
+-
+ type testPrompt struct {
+ 	ctx    context.Context
+ 	t      *testing.T
+@@ -1144,87 +1071,6 @@ func testClientGatewayContainerExecTty(t *testing.T, sb integration.Sandbox) {
+ 	checkAllReleasable(t, c, sb, true)
+ }
+ 
+-// testClientGatewayContainerExecTty is testing the tty shuts down cleanly
+-// on context.Cancel
+-func testClientGatewayContainerCancelExecTty(t *testing.T, sb integration.Sandbox) {
+-	requiresLinux(t)
+-	ctx := sb.Context()
+-
+-	c, err := New(ctx, sb.Address())
+-	require.NoError(t, err)
+-	defer c.Close()
+-
+-	product := "buildkit_test"
+-
+-	inputR, inputW := io.Pipe()
+-	output := bytes.NewBuffer(nil)
+-	b := func(ctx context.Context, c client.Client) (*client.Result, error) {
+-		ctx, timeout := context.WithTimeout(ctx, 10*time.Second)
+-		defer timeout()
+-		st := llb.Image("busybox:latest")
+-
+-		def, err := st.Marshal(ctx)
+-		if err != nil {
+-			return nil, errors.Wrap(err, "failed to marshal state")
+-		}
+-
+-		r, err := c.Solve(ctx, client.SolveRequest{
+-			Definition: def.ToPB(),
+-		})
+-		if err != nil {
+-			return nil, errors.Wrap(err, "failed to solve")
+-		}
+-
+-		ctr, err := c.NewContainer(ctx, client.NewContainerRequest{
+-			Mounts: []client.Mount{{
+-				Dest:      "/",
+-				MountType: pb.MountType_BIND,
+-				Ref:       r.Ref,
+-			}},
+-		})
+-		require.NoError(t, err)
+-
+-		pid1, err := ctr.Start(ctx, client.StartRequest{
+-			Args: []string{"sleep", "10"},
+-		})
+-		require.NoError(t, err)
+-
+-		defer pid1.Wait()
+-		defer ctr.Release(ctx)
+-
+-		execCtx, cancel := context.WithCancel(ctx)
+-		defer cancel()
+-
+-		prompt := newTestPrompt(execCtx, t, inputW, output)
+-		pid2, err := ctr.Start(execCtx, client.StartRequest{
+-			Args:   []string{"sh"},
+-			Tty:    true,
+-			Stdin:  inputR,
+-			Stdout: &nopCloser{output},
+-			Stderr: &nopCloser{output},
+-			Env:    []string{fmt.Sprintf("PS1=%s", prompt.String())},
+-		})
+-		require.NoError(t, err)
+-
+-		prompt.SendExpect("echo hi", "hi")
+-		cancel()
+-
+-		err = pid2.Wait()
+-		require.ErrorIs(t, err, context.Canceled)
+-
+-		return &client.Result{}, err
+-	}
+-
+-	_, err = c.Build(ctx, SolveOpt{}, product, b, nil)
+-	require.Error(t, err)
+-	require.Contains(t, err.Error(), context.Canceled.Error())
+-
+-	inputW.Close()
+-	inputR.Close()
+-
+-	checkAllReleasable(t, c, sb, true)
+-}
+-
+ func testClientSlowCacheRootfsRef(t *testing.T, sb integration.Sandbox) {
+ 	requiresLinux(t)
+ 
+@@ -2145,7 +1991,6 @@ func testClientGatewayContainerSignal(t *testing.T, sb integration.Sandbox) {
  }
  
  func testClientGatewayNilResult(t *testing.T, sb integration.Sandbox) {
@@ -614,10 +790,18 @@ index 75ebce6..1376c15 100644
  	c, err := New(sb.Context(), sb.Address())
  	require.NoError(t, err)
 diff --git upstream/v0.11/client/client_test.go origin/v0.11/client/client_test.go
-index 6ca36d2..b97eb75 100644
+index 348d810..b97eb75 100644
 --- upstream/v0.11/client/client_test.go
 +++ origin/v0.11/client/client_test.go
-@@ -246,7 +246,7 @@ func newContainerd(cdAddress string) (*containerd.Client, error) {
+@@ -195,7 +195,6 @@ func TestIntegration(t *testing.T) {
+ 		testMountStubsDirectory,
+ 		testMountStubsTimestamp,
+ 		testSourcePolicy,
+-		testLLBMountPerformance,
+ 	)
+ }
+ 
+@@ -247,7 +246,7 @@ func newContainerd(cdAddress string) (*containerd.Client, error) {
  
  // moby/buildkit#1336
  func testCacheExportCacheKeyLoop(t *testing.T, sb integration.Sandbox) {
@@ -626,7 +810,7 @@ index 6ca36d2..b97eb75 100644
  	c, err := New(sb.Context(), sb.Address())
  	require.NoError(t, err)
  	defer c.Close()
-@@ -975,6 +975,7 @@ func testSecurityModeErrors(t *testing.T, sb integration.Sandbox) {
+@@ -976,6 +975,7 @@ func testSecurityModeErrors(t *testing.T, sb integration.Sandbox) {
  }
  
  func testFrontendImageNaming(t *testing.T, sb integration.Sandbox) {
@@ -634,7 +818,7 @@ index 6ca36d2..b97eb75 100644
  	requiresLinux(t)
  	c, err := New(sb.Context(), sb.Address())
  	require.NoError(t, err)
-@@ -1083,15 +1084,12 @@ func testFrontendImageNaming(t *testing.T, sb integration.Sandbox) {
+@@ -1084,15 +1084,12 @@ func testFrontendImageNaming(t *testing.T, sb integration.Sandbox) {
  
  					switch exp {
  					case ExporterOCI:
@@ -650,7 +834,7 @@ index 6ca36d2..b97eb75 100644
  						imageName = registry + "/" + imageName
  						so.Exports[0].Attrs["push"] = "true"
  					}
-@@ -3750,11 +3748,7 @@ func testBuildPushAndValidate(t *testing.T, sb integration.Sandbox) {
+@@ -3751,11 +3748,7 @@ func testBuildPushAndValidate(t *testing.T, sb integration.Sandbox) {
  }
  
  func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -663,7 +847,7 @@ index 6ca36d2..b97eb75 100644
  	requiresLinux(t)
  	cdAddress := sb.ContainerdAddress()
  	if cdAddress == "" || sb.Snapshotter() != "stargz" {
-@@ -3814,7 +3808,6 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
+@@ -3815,7 +3808,6 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
  
  	// clear all local state out
  	ensurePruneAll(t, c, sb)
@@ -671,7 +855,7 @@ index 6ca36d2..b97eb75 100644
  
  	// stargz layers should be lazy even for executing something on them
  	def, err = baseDef.
-@@ -3902,12 +3895,7 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
+@@ -3903,12 +3895,7 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
  }
  
  func testStargzLazyInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -685,7 +869,7 @@ index 6ca36d2..b97eb75 100644
  	requiresLinux(t)
  	cdAddress := sb.ContainerdAddress()
  	if cdAddress == "" || sb.Snapshotter() != "stargz" {
-@@ -4322,7 +4310,7 @@ func testLazyImagePush(t *testing.T, sb integration.Sandbox) {
+@@ -4323,7 +4310,7 @@ func testLazyImagePush(t *testing.T, sb integration.Sandbox) {
  }
  
  func testZstdLocalCacheExport(t *testing.T, sb integration.Sandbox) {
@@ -694,7 +878,7 @@ index 6ca36d2..b97eb75 100644
  	c, err := New(sb.Context(), sb.Address())
  	require.NoError(t, err)
  	defer c.Close()
-@@ -4464,21 +4452,12 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
+@@ -4465,21 +4452,12 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
  	for _, ignoreError := range ignoreErrorValues {
  		ignoreErrStr := strconv.FormatBool(ignoreError)
  		for n, test := range tests {
@@ -716,7 +900,7 @@ index 6ca36d2..b97eb75 100644
  				_, err = c.Solve(sb.Context(), def, SolveOpt{
  					Exports:      test.Exports,
  					CacheExports: test.CacheExports,
-@@ -4497,11 +4476,7 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
+@@ -4498,11 +4476,7 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
  }
  
  func testUncompressedLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -729,7 +913,7 @@ index 6ca36d2..b97eb75 100644
  	dir := t.TempDir()
  	im := CacheOptionsEntry{
  		Type: "local",
-@@ -4521,11 +4496,7 @@ func testUncompressedLocalCacheImportExport(t *testing.T, sb integration.Sandbox
+@@ -4522,11 +4496,7 @@ func testUncompressedLocalCacheImportExport(t *testing.T, sb integration.Sandbox
  }
  
  func testUncompressedRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -742,7 +926,7 @@ index 6ca36d2..b97eb75 100644
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
  		t.Skip(err.Error())
-@@ -4550,11 +4521,7 @@ func testUncompressedRegistryCacheImportExport(t *testing.T, sb integration.Sand
+@@ -4551,11 +4521,7 @@ func testUncompressedRegistryCacheImportExport(t *testing.T, sb integration.Sand
  }
  
  func testZstdLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -755,7 +939,7 @@ index 6ca36d2..b97eb75 100644
  	dir := t.TempDir()
  	im := CacheOptionsEntry{
  		Type: "local",
-@@ -4575,11 +4542,7 @@ func testZstdLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4576,11 +4542,7 @@ func testZstdLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
  }
  
  func testZstdRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -768,7 +952,7 @@ index 6ca36d2..b97eb75 100644
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
  		t.Skip(err.Error())
-@@ -4667,11 +4630,7 @@ func testBasicCacheImportExport(t *testing.T, sb integration.Sandbox, cacheOptio
+@@ -4668,11 +4630,7 @@ func testBasicCacheImportExport(t *testing.T, sb integration.Sandbox, cacheOptio
  }
  
  func testBasicRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -781,7 +965,7 @@ index 6ca36d2..b97eb75 100644
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
  		t.Skip(err.Error())
-@@ -4688,11 +4647,7 @@ func testBasicRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4689,11 +4647,7 @@ func testBasicRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
  }
  
  func testMultipleRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -794,7 +978,7 @@ index 6ca36d2..b97eb75 100644
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
  		t.Skip(err.Error())
-@@ -4715,11 +4670,7 @@ func testMultipleRegistryCacheImportExport(t *testing.T, sb integration.Sandbox)
+@@ -4716,11 +4670,7 @@ func testMultipleRegistryCacheImportExport(t *testing.T, sb integration.Sandbox)
  }
  
  func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -807,7 +991,7 @@ index 6ca36d2..b97eb75 100644
  	dir := t.TempDir()
  	im := CacheOptionsEntry{
  		Type: "local",
-@@ -4737,11 +4688,7 @@ func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4738,11 +4688,7 @@ func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
  }
  
  func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -820,7 +1004,7 @@ index 6ca36d2..b97eb75 100644
  	requiresLinux(t)
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
-@@ -4793,7 +4740,6 @@ func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4794,7 +4740,6 @@ func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
  	require.NoError(t, err)
  
  	ensurePruneAll(t, c, sb)
@@ -828,7 +1012,7 @@ index 6ca36d2..b97eb75 100644
  
  	resp, err = c.Solve(sb.Context(), def, SolveOpt{
  		// specifying inline cache exporter is needed for reproducing containerimage.digest
-@@ -5668,7 +5614,6 @@ func testProxyEnv(t *testing.T, sb integration.Sandbox) {
+@@ -5669,7 +5614,6 @@ func testProxyEnv(t *testing.T, sb integration.Sandbox) {
  }
  
  func testMergeOp(t *testing.T, sb integration.Sandbox) {
@@ -836,7 +1020,7 @@ index 6ca36d2..b97eb75 100644
  	requiresLinux(t)
  
  	c, err := New(sb.Context(), sb.Address())
-@@ -5781,7 +5726,7 @@ func testMergeOpCacheMax(t *testing.T, sb integration.Sandbox) {
+@@ -5782,7 +5726,7 @@ func testMergeOpCacheMax(t *testing.T, sb integration.Sandbox) {
  
  func testMergeOpCache(t *testing.T, sb integration.Sandbox, mode string) {
  	t.Helper()
@@ -845,6 +1029,38 @@ index 6ca36d2..b97eb75 100644
  	requiresLinux(t)
  
  	cdAddress := sb.ContainerdAddress()
+@@ -8946,31 +8890,3 @@ func testSourcePolicy(t *testing.T, sb integration.Sandbox) {
+ 		require.ErrorContains(t, err, sourcepolicy.ErrSourceDenied.Error())
+ 	})
+ }
+-
+-func testLLBMountPerformance(t *testing.T, sb integration.Sandbox) {
+-	c, err := New(sb.Context(), sb.Address())
+-	require.NoError(t, err)
+-	defer c.Close()
+-
+-	mntInput := llb.Image("busybox:latest")
+-	st := llb.Image("busybox:latest")
+-	var mnts []llb.State
+-	for i := 0; i < 20; i++ {
+-		execSt := st.Run(
+-			llb.Args([]string{"true"}),
+-		)
+-		mnts = append(mnts, mntInput)
+-		for j := range mnts {
+-			mnts[j] = execSt.AddMount(fmt.Sprintf("/tmp/bin%d", j), mnts[j], llb.SourcePath("/bin"))
+-		}
+-		st = execSt.Root()
+-	}
+-
+-	def, err := st.Marshal(sb.Context())
+-	require.NoError(t, err)
+-
+-	timeoutCtx, cancel := context.WithTimeout(sb.Context(), time.Minute)
+-	defer cancel()
+-	_, err = c.Solve(timeoutCtx, def, SolveOpt{}, nil)
+-	require.NoError(t, err)
+-}
 diff --git upstream/v0.11/client/llb/definition.go origin/v0.11/client/llb/definition.go
 index f92ee2d..d6dda89 100644
 --- upstream/v0.11/client/llb/definition.go
@@ -964,6 +1180,302 @@ index f825b1d..94b48a7 100644
  	return s, releaseAll, nil
  }
  
+diff --git upstream/v0.11/executor/runcexecutor/executor.go origin/v0.11/executor/runcexecutor/executor.go
+index 19f7fbd..213ebb7 100644
+--- upstream/v0.11/executor/runcexecutor/executor.go
++++ origin/v0.11/executor/runcexecutor/executor.go
+@@ -92,7 +92,7 @@ func New(opt Opt, networkProviders map[pb.NetMode]network.Provider) (executor.Ex
+ 
+ 	root := opt.Root
+ 
+-	if err := os.MkdirAll(root, 0o711); err != nil {
++	if err := os.MkdirAll(root, 0711); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to create %s", root)
+ 	}
+ 
+@@ -205,7 +205,7 @@ func (w *runcExecutor) Run(ctx context.Context, id string, root executor.Mount,
+ 	}
+ 	bundle := filepath.Join(w.root, id)
+ 
+-	if err := os.Mkdir(bundle, 0o711); err != nil {
++	if err := os.Mkdir(bundle, 0711); err != nil {
+ 		return err
+ 	}
+ 	defer os.RemoveAll(bundle)
+@@ -216,7 +216,7 @@ func (w *runcExecutor) Run(ctx context.Context, id string, root executor.Mount,
+ 	}
+ 
+ 	rootFSPath := filepath.Join(bundle, "rootfs")
+-	if err := idtools.MkdirAllAndChown(rootFSPath, 0o700, identity); err != nil {
++	if err := idtools.MkdirAllAndChown(rootFSPath, 0700, identity); err != nil {
+ 		return err
+ 	}
+ 	if err := mount.All(rootMount, rootFSPath); err != nil {
+@@ -270,7 +270,7 @@ func (w *runcExecutor) Run(ctx context.Context, id string, root executor.Mount,
+ 		return errors.Wrapf(err, "working dir %s points to invalid target", newp)
+ 	}
+ 	if _, err := os.Stat(newp); err != nil {
+-		if err := idtools.MkdirAllAndChown(newp, 0o755, identity); err != nil {
++		if err := idtools.MkdirAllAndChown(newp, 0755, identity); err != nil {
+ 			return errors.Wrapf(err, "failed to create working directory %s", newp)
+ 		}
+ 	}
+@@ -287,10 +287,42 @@ func (w *runcExecutor) Run(ctx context.Context, id string, root executor.Mount,
+ 		return err
+ 	}
+ 
++	// runCtx/killCtx is used for extra check in case the kill command blocks
++	runCtx, cancelRun := context.WithCancel(context.Background())
++	defer cancelRun()
++
++	ended := make(chan struct{})
++	go func() {
++		for {
++			select {
++			case <-ctx.Done():
++				killCtx, timeout := context.WithTimeout(context.Background(), 7*time.Second)
++				if err := w.runc.Kill(killCtx, id, int(syscall.SIGKILL), nil); err != nil {
++					bklog.G(ctx).Errorf("failed to kill runc %s: %+v", id, err)
++					select {
++					case <-killCtx.Done():
++						timeout()
++						cancelRun()
++						return
++					default:
++					}
++				}
++				timeout()
++				select {
++				case <-time.After(50 * time.Millisecond):
++				case <-ended:
++					return
++				}
++			case <-ended:
++				return
++			}
++		}
++	}()
++
+ 	bklog.G(ctx).Debugf("> creating %s %v", id, meta.Args)
+ 
+ 	trace.SpanFromContext(ctx).AddEvent("Container created")
+-	err = w.run(ctx, id, bundle, process, func() {
++	err = w.run(runCtx, id, bundle, process, func() {
+ 		startedOnce.Do(func() {
+ 			trace.SpanFromContext(ctx).AddEvent("Container started")
+ 			if started != nil {
+@@ -298,6 +330,7 @@ func (w *runcExecutor) Run(ctx context.Context, id string, root executor.Mount,
+ 			}
+ 		})
+ 	})
++	close(ended)
+ 	return exitError(ctx, err)
+ }
+ 
+@@ -429,87 +462,23 @@ func (s *forwardIO) Stderr() io.ReadCloser {
+ 	return nil
+ }
+ 
+-// procHandle is to track the os process so we can send signals to it.
+-type procHandle struct {
+-	Process  *os.Process
+-	ready    chan struct{}
+-	ended    chan struct{}
+-	shutdown func()
++// startingProcess is to track the os process so we can send signals to it.
++type startingProcess struct {
++	Process *os.Process
++	ready   chan struct{}
+ }
+ 
+-// runcProcessHandle will create a procHandle that will be monitored, where
+-// on ctx.Done the process will be killed.  If the kill fails, then the cancel
+-// will be called.  This is to allow for runc to go through its normal shutdown
+-// procedure if the ctx is canceled and to ensure there are no zombie processes
+-// left by runc.
+-func runcProcessHandle(ctx context.Context, id string) (*procHandle, context.Context) {
+-	runcCtx, cancel := context.WithCancel(context.Background())
+-	p := &procHandle{
+-		ready:    make(chan struct{}),
+-		ended:    make(chan struct{}),
+-		shutdown: cancel,
+-	}
+-	// preserve the logger on the context used for the runc process handling
+-	runcCtx = bklog.WithLogger(runcCtx, bklog.G(ctx))
+-
+-	go func() {
+-		// Wait for pid
+-		select {
+-		case <-ctx.Done():
+-			return // nothing to kill
+-		case <-p.ready:
+-		}
+-
+-		for {
+-			select {
+-			case <-ctx.Done():
+-				killCtx, timeout := context.WithTimeout(context.Background(), 7*time.Second)
+-				if err := p.Process.Kill(); err != nil {
+-					bklog.G(ctx).Errorf("failed to kill runc %s: %+v", id, err)
+-					select {
+-					case <-killCtx.Done():
+-						timeout()
+-						cancel()
+-						return
+-					default:
+-					}
+-				}
+-				timeout()
+-				select {
+-				case <-time.After(50 * time.Millisecond):
+-				case <-p.ended:
+-					return
+-				}
+-			case <-p.ended:
+-				return
+-			}
+-		}
+-	}()
+-
+-	return p, runcCtx
+-}
+-
+-// Release will free resources with a procHandle.
+-func (p *procHandle) Release() {
+-	close(p.ended)
++// Release will free resources with a startingProcess.
++func (p *startingProcess) Release() {
+ 	if p.Process != nil {
+ 		p.Process.Release()
+ 	}
+ }
+ 
+-// Shutdown should be called after the runc process has exited. This will allow
+-// the signal handling and tty resize loops to exit, terminating the
+-// goroutines.
+-func (p *procHandle) Shutdown() {
+-	if p.shutdown != nil {
+-		p.shutdown()
+-	}
+-}
+-
+ // WaitForReady will wait until the Process has been populated or the
+ // provided context was cancelled.  This should be called before using
+ // the Process field.
+-func (p *procHandle) WaitForReady(ctx context.Context) error {
++func (p *startingProcess) WaitForReady(ctx context.Context) error {
+ 	select {
+ 	case <-ctx.Done():
+ 		return ctx.Err()
+@@ -521,7 +490,7 @@ func (p *procHandle) WaitForReady(ctx context.Context) error {
+ // WaitForStart will record the pid reported by Runc via the channel.
+ // We wait for up to 10s for the runc process to start.  If the started
+ // callback is non-nil it will be called after receiving the pid.
+-func (p *procHandle) WaitForStart(ctx context.Context, startedCh <-chan int, started func()) error {
++func (p *startingProcess) WaitForStart(ctx context.Context, startedCh <-chan int, started func()) error {
+ 	startedCtx, timeout := context.WithTimeout(ctx, 10*time.Second)
+ 	defer timeout()
+ 	var err error
+@@ -546,7 +515,7 @@ func (p *procHandle) WaitForStart(ctx context.Context, startedCh <-chan int, sta
+ 
+ // handleSignals will wait until the runcProcess is ready then will
+ // send each signal received on the channel to the process.
+-func handleSignals(ctx context.Context, runcProcess *procHandle, signals <-chan syscall.Signal) error {
++func handleSignals(ctx context.Context, runcProcess *startingProcess, signals <-chan syscall.Signal) error {
+ 	if signals == nil {
+ 		return nil
+ 	}
+diff --git upstream/v0.11/executor/runcexecutor/executor_common.go origin/v0.11/executor/runcexecutor/executor_common.go
+index 44c696f..447c4a9 100644
+--- upstream/v0.11/executor/runcexecutor/executor_common.go
++++ origin/v0.11/executor/runcexecutor/executor_common.go
+@@ -49,20 +49,23 @@ type runcCall func(ctx context.Context, started chan<- int, io runc.IO) error
+ // is only supported for linux, so this really just handles signal propagation
+ // to the started runc process.
+ func (w *runcExecutor) commonCall(ctx context.Context, id, bundle string, process executor.ProcessInfo, started func(), call runcCall) error {
+-	runcProcess, ctx := runcProcessHandle(ctx, id)
++	runcProcess := &startingProcess{
++		ready: make(chan struct{}),
++	}
+ 	defer runcProcess.Release()
+ 
+-	eg, ctx := errgroup.WithContext(ctx)
++	var eg errgroup.Group
++	egCtx, cancel := context.WithCancel(ctx)
+ 	defer eg.Wait()
+-	defer runcProcess.Shutdown()
++	defer cancel()
+ 
+ 	startedCh := make(chan int, 1)
+ 	eg.Go(func() error {
+-		return runcProcess.WaitForStart(ctx, startedCh, started)
++		return runcProcess.WaitForStart(egCtx, startedCh, started)
+ 	})
+ 
+ 	eg.Go(func() error {
+-		return handleSignals(ctx, runcProcess, process.Signal)
++		return handleSignals(egCtx, runcProcess, process.Signal)
+ 	})
+ 
+ 	return call(ctx, startedCh, &forwardIO{stdin: process.Stdin, stdout: process.Stdout, stderr: process.Stderr})
+diff --git upstream/v0.11/executor/runcexecutor/executor_linux.go origin/v0.11/executor/runcexecutor/executor_linux.go
+index dbf7306..15ea812 100644
+--- upstream/v0.11/executor/runcexecutor/executor_linux.go
++++ origin/v0.11/executor/runcexecutor/executor_linux.go
+@@ -44,20 +44,23 @@ func (w *runcExecutor) exec(ctx context.Context, id, bundle string, specsProcess
+ type runcCall func(ctx context.Context, started chan<- int, io runc.IO) error
+ 
+ func (w *runcExecutor) callWithIO(ctx context.Context, id, bundle string, process executor.ProcessInfo, started func(), call runcCall) error {
+-	runcProcess, ctx := runcProcessHandle(ctx, id)
++	runcProcess := &startingProcess{
++		ready: make(chan struct{}),
++	}
+ 	defer runcProcess.Release()
+ 
+-	eg, ctx := errgroup.WithContext(ctx)
++	var eg errgroup.Group
++	egCtx, cancel := context.WithCancel(ctx)
+ 	defer eg.Wait()
+-	defer runcProcess.Shutdown()
++	defer cancel()
+ 
+ 	startedCh := make(chan int, 1)
+ 	eg.Go(func() error {
+-		return runcProcess.WaitForStart(ctx, startedCh, started)
++		return runcProcess.WaitForStart(egCtx, startedCh, started)
+ 	})
+ 
+ 	eg.Go(func() error {
+-		return handleSignals(ctx, runcProcess, process.Signal)
++		return handleSignals(egCtx, runcProcess, process.Signal)
+ 	})
+ 
+ 	if !process.Meta.Tty {
+@@ -81,7 +84,7 @@ func (w *runcExecutor) callWithIO(ctx context.Context, id, bundle string, proces
+ 		}
+ 		pts.Close()
+ 		ptm.Close()
+-		runcProcess.Shutdown()
++		cancel() // this will shutdown resize and signal loops
+ 		err := eg.Wait()
+ 		if err != nil {
+ 			bklog.G(ctx).Warningf("error while shutting down tty io: %s", err)
+@@ -116,13 +119,13 @@ func (w *runcExecutor) callWithIO(ctx context.Context, id, bundle string, proces
+ 	}
+ 
+ 	eg.Go(func() error {
+-		err := runcProcess.WaitForReady(ctx)
++		err := runcProcess.WaitForReady(egCtx)
+ 		if err != nil {
+ 			return err
+ 		}
+ 		for {
+ 			select {
+-			case <-ctx.Done():
++			case <-egCtx.Done():
+ 				return nil
+ 			case resize := <-process.Resize:
+ 				err = ptm.Resize(console.WinSize{
 diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
 index 2ebcd9a..82f829c 100644
 --- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
@@ -1009,6 +1521,24 @@ index 2ebcd9a..82f829c 100644
  
  	dir, err := integration.Tmpdir(
  		t,
+diff --git upstream/v0.11/frontend/gateway/grpcclient/client.go origin/v0.11/frontend/gateway/grpcclient/client.go
+index 252617f..1b000a8 100644
+--- upstream/v0.11/frontend/gateway/grpcclient/client.go
++++ origin/v0.11/frontend/gateway/grpcclient/client.go
+@@ -927,11 +927,11 @@ func (ctr *container) Start(ctx context.Context, req client.StartRequest) (clien
+ 
+ 			if msg == nil {
+ 				// empty message from ctx cancel, so just start shutting down
+-				// input
++				// input, but continue processing more exit/done messages
+ 				closeDoneOnce.Do(func() {
+ 					close(done)
+ 				})
+-				return ctx.Err()
++				continue
+ 			}
+ 
+ 			if file := msg.GetFile(); file != nil {
 diff --git upstream/v0.11/hack/test origin/v0.11/hack/test
 index 7b2ffa3..929733d 100755
 --- upstream/v0.11/hack/test
@@ -1059,6 +1589,101 @@ index a4b7b1a..27cff3e 100644
  	if len(lm.mounts) == 1 && (lm.mounts[0].Type == "bind" || lm.mounts[0].Type == "rbind") {
  		ro := false
  		for _, opt := range lm.mounts[0].Options {
+diff --git upstream/v0.11/solver/llbsolver/history.go origin/v0.11/solver/llbsolver/history.go
+index 09aa198..c8310cc 100644
+--- upstream/v0.11/solver/llbsolver/history.go
++++ origin/v0.11/solver/llbsolver/history.go
+@@ -102,13 +102,13 @@ func (h *HistoryQueue) gc() error {
+ 	}
+ 
+ 	// in order for record to get deleted by gc it exceed both maxentries and maxage criteria
++
+ 	if len(records) < int(h.CleanConfig.MaxEntries) {
+ 		return nil
+ 	}
+ 
+-	// sort array by newest records first
+ 	sort.Slice(records, func(i, j int) bool {
+-		return records[i].CompletedAt.After(*records[j].CompletedAt)
++		return records[i].CompletedAt.Before(*records[j].CompletedAt)
+ 	})
+ 
+ 	h.mu.Lock()
+diff --git upstream/v0.11/solver/llbsolver/solver.go origin/v0.11/solver/llbsolver/solver.go
+index d65a9e6..2f7ba61 100644
+--- upstream/v0.11/solver/llbsolver/solver.go
++++ origin/v0.11/solver/llbsolver/solver.go
+@@ -423,6 +423,15 @@ func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req fro
+ 
+ 	if internal {
+ 		defer j.CloseProgress()
++	} else {
++		rec, err1 := s.recordBuildHistory(ctx, id, req, exp, j)
++		if err != nil {
++			defer j.CloseProgress()
++			return nil, err1
++		}
++		defer func() {
++			err = rec(resProv, descref, err)
++		}()
+ 	}
+ 
+ 	set, err := entitlements.WhiteList(ent, supportedEntitlements(s.entitlements))
+@@ -438,32 +447,14 @@ func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req fro
+ 	j.SessionID = sessionID
+ 
+ 	br := s.bridge(j)
+-	var fwd gateway.LLBBridgeForwarder
+ 	if s.gatewayForwarder != nil && req.Definition == nil && req.Frontend == "" {
+-		fwd = gateway.NewBridgeForwarder(ctx, br, s.workerController, req.FrontendInputs, sessionID, s.sm)
++		fwd := gateway.NewBridgeForwarder(ctx, br, s.workerController, req.FrontendInputs, sessionID, s.sm)
+ 		defer fwd.Discard()
+-		// Register build before calling s.recordBuildHistory, because
+-		// s.recordBuildHistory can block for several seconds on
+-		// LeaseManager calls, and there is a fixed 3s timeout in
+-		// GatewayForwarder on build registration.
+ 		if err := s.gatewayForwarder.RegisterBuild(ctx, id, fwd); err != nil {
+ 			return nil, err
+ 		}
+ 		defer s.gatewayForwarder.UnregisterBuild(ctx, id)
+-	}
+-
+-	if !internal {
+-		rec, err1 := s.recordBuildHistory(ctx, id, req, exp, j)
+-		if err1 != nil {
+-			defer j.CloseProgress()
+-			return nil, err1
+-		}
+-		defer func() {
+-			err = rec(resProv, descref, err)
+-		}()
+-	}
+ 
+-	if fwd != nil {
+ 		var err error
+ 		select {
+ 		case <-fwd.Done():
+diff --git upstream/v0.11/solver/llbsolver/vertex.go origin/v0.11/solver/llbsolver/vertex.go
+index 41a31bb..6901332 100644
+--- upstream/v0.11/solver/llbsolver/vertex.go
++++ origin/v0.11/solver/llbsolver/vertex.go
+@@ -210,7 +210,6 @@ func recomputeDigests(ctx context.Context, all map[digest.Digest]*pb.Op, visited
+ 	}
+ 
+ 	if !mutated {
+-		visited[dgst] = dgst
+ 		return dgst, nil
+ 	}
+ 
+@@ -275,7 +274,7 @@ func loadLLB(ctx context.Context, def *pb.Definition, polEngine SourcePolicyEval
+ 
+ 	for {
+ 		newDgst, ok := mutatedDigests[lastDgst]
+-		if !ok || newDgst == lastDgst {
++		if !ok {
+ 			break
+ 		}
+ 		lastDgst = newDgst
 diff --git upstream/v0.11/util/rootless/mountopts/mountopts_linux.go origin/v0.11/util/rootless/mountopts/mountopts_linux.go
 deleted file mode 100644
 index 92c542b..0000000
