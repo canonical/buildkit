@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..12f0621 100644
+index 40d60dc..8170dd5 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -22,8 +22,13 @@ on:
@@ -29,7 +29,7 @@ index 40d60dc..12f0621 100644
            RUNC_PLATFORMS: ${{ env.PLATFORMS }}
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
            CACHE_TO: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
-@@ -383,8 +390,9 @@ jobs:
+@@ -383,12 +390,16 @@ jobs:
          if: needs.release-base.outputs.push == 'push'
          uses: docker/login-action@v2
          with:
@@ -41,7 +41,14 @@ index 40d60dc..12f0621 100644
        -
          name: Build ${{ needs.release-base.outputs.tag }}
          run: |
-@@ -421,7 +429,9 @@ jobs:
++          echo ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }} > artifactory_token
++          echo ${{ secrets.ARTIFACTORY_URL }} > artifactory_url
+           ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" "${{ needs.release-base.outputs.push }}"
++          rm artifactory_token artifactory_url
+         env:
+           RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
+           TARGET: ${{ matrix.target-stage }}
+@@ -421,7 +432,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -52,7 +59,7 @@ index 40d60dc..12f0621 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -441,82 +451,83 @@ jobs:
+@@ -441,82 +454,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
@@ -347,10 +354,10 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index b64f57b..939af14 100644
+index b64f57b..416638a 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
-@@ -1,6 +1,6 @@
+@@ -1,62 +1,67 @@
  # syntax=docker/dockerfile-upstream:master
  
 -ARG RUNC_VERSION=v1.1.4
@@ -358,7 +365,13 @@ index b64f57b..939af14 100644
  ARG CONTAINERD_VERSION=v1.6.18
  # containerd v1.5 for integration tests
  ARG CONTAINERD_ALT_VERSION_15=v1.5.18
-@@ -12,51 +12,55 @@ ARG NERDCTL_VERSION=v1.0.0
+ ARG REGISTRY_VERSION=2.8.0
+-ARG ROOTLESSKIT_VERSION=v1.0.1
++# ARG ROOTLESSKIT_VERSION=v1.0.1
++ARG ROOTLESSKIT_VERSION=0.14.6
+ ARG CNI_VERSION=v1.1.1
+ ARG STARGZ_SNAPSHOTTER_VERSION=v0.13.0
+ ARG NERDCTL_VERSION=v1.0.0
  ARG DNSNAME_VERSION=v1.3.1
  ARG NYDUS_VERSION=v2.1.0
  
@@ -443,7 +456,7 @@ index b64f57b..939af14 100644
  
  # dnsname CNI plugin for testing
  FROM gobuild-base AS dnsname
-@@ -75,7 +79,7 @@ ENV GOFLAGS=-mod=vendor
+@@ -75,7 +80,7 @@ ENV GOFLAGS=-mod=vendor
  FROM buildkit-base AS buildkit-version
  # TODO: PKG should be inferred from go modules
  RUN --mount=target=. \
@@ -452,7 +465,7 @@ index b64f57b..939af14 100644
    echo "-X ${PKG}/version.Version=${VERSION} -X ${PKG}/version.Revision=${REVISION} -X ${PKG}/version.Package=${PKG}" | tee /tmp/.ldflags; \
    echo -n "${VERSION}" | tee /tmp/.version;
  
-@@ -101,7 +105,7 @@ RUN --mount=target=. --mount=target=/root/.cache,type=cache \
+@@ -101,7 +106,7 @@ RUN --mount=target=. --mount=target=/root/.cache,type=cache \
    xx-verify --static /usr/bin/buildkitd
  
  FROM scratch AS binaries-linux-helper
@@ -461,7 +474,7 @@ index b64f57b..939af14 100644
  # built from https://github.com/tonistiigi/binfmt/releases/tag/buildkit%2Fv7.1.0-30
  COPY --link --from=tonistiigi/binfmt:buildkit-v7.1.0-30@sha256:45dd57b4ba2f24e2354f71f1e4e51f073cb7a28fd848ce6f5f2a7701142a6bf0 / /
  
-@@ -119,8 +123,8 @@ FROM binaries-$TARGETOS AS binaries
+@@ -119,8 +124,8 @@ FROM binaries-$TARGETOS AS binaries
  # enable scanning for this stage
  ARG BUILDKIT_SBOM_SCAN_STAGE=true
  
@@ -472,7 +485,7 @@ index b64f57b..939af14 100644
  WORKDIR /work
  ARG TARGETPLATFORM
  RUN --mount=from=binaries \
-@@ -130,9 +134,10 @@ RUN --mount=from=binaries \
+@@ -130,9 +135,10 @@ RUN --mount=from=binaries \
  FROM scratch AS release
  COPY --link --from=releaser /out/ /
  
@@ -486,7 +499,7 @@ index b64f57b..939af14 100644
  COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
  VOLUME /var/lib/buildkit
  
-@@ -146,7 +151,7 @@ FROM gobuild-base AS containerd-base
+@@ -146,7 +152,7 @@ FROM gobuild-base AS containerd-base
  WORKDIR /go/src/github.com/containerd/containerd
  ARG TARGETPLATFORM
  ENV CGO_ENABLED=1 BUILDTAGS=no_btrfs GO111MODULE=off
@@ -495,7 +508,31 @@ index b64f57b..939af14 100644
  
  FROM containerd-base AS containerd
  ARG CONTAINERD_VERSION
-@@ -211,8 +216,8 @@ FROM binaries AS buildkit-windows
+@@ -173,11 +179,21 @@ FROM registry:$REGISTRY_VERSION AS registry
+ 
+ FROM gobuild-base AS rootlesskit
+ ARG ROOTLESSKIT_VERSION
+-RUN git clone https://github.com/rootless-containers/rootlesskit.git /go/src/github.com/rootless-containers/rootlesskit
++COPY canonical_utils/artifactory /opt/utils
++WORKDIR /opt/utils
++RUN apt install -y python3 python3-pip && \
++  pip install -r requirements.txt
++RUN --mount=type=secret,id=artifactory_token,dst=/etc/secrets/token \
++  --mount=type=secret,id=artifactory_url,dst=/etc/secrets/url \
++  ./fetch_from_artifactory.py --artifactory-url-file /etc/secrets/url \
++  --artifact-path 'jammy-rootlesskit-backport/pool/r/rootlesskit/rootlesskit_${ROOTLESSKIT_VERSION}.orig.tar.gz' \
++  --token-file /etc/secrets/token --output-file rootlesskit.tar.gz
++# RUN git clone https://github.com/rootless-containers/rootlesskit.git /go/src/github.com/rootless-containers/rootlesskit
+ WORKDIR /go/src/github.com/rootless-containers/rootlesskit
+ ARG TARGETPLATFORM
+ RUN  --mount=target=/root/.cache,type=cache \
+-  git checkout -q "$ROOTLESSKIT_VERSION"  && \
++  tar -xvf rootlesskit.tar.gz -C . --strip-components=1 && \
++  # git checkout -q "$ROOTLESSKIT_VERSION"  && \
+   CGO_ENABLED=0 xx-go build -o /rootlesskit ./cmd/rootlesskit && \
+   xx-verify --static /rootlesskit
+ 
+@@ -211,8 +227,8 @@ FROM binaries AS buildkit-windows
  # this is not in binaries-windows because it is not intended for release yet, just CI
  COPY --link --from=buildkitd /usr/bin/buildkitd /buildkitd.exe
  
@@ -506,7 +543,7 @@ index b64f57b..939af14 100644
  ARG CNI_VERSION
  ARG TARGETOS
  ARG TARGETARCH
-@@ -223,7 +228,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
+@@ -223,7 +239,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
  FROM buildkit-base AS integration-tests-base
  ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
  ARG NERDCTL_VERSION
@@ -517,7 +554,7 @@ index b64f57b..939af14 100644
    && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
    && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
    && mkdir -m 0700 -p /run/user/1000 \
-@@ -242,10 +249,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
+@@ -242,10 +260,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
  ENV CGO_ENABLED=0
  COPY --link --from=nydus /out/nydus-static/* /usr/bin/
  COPY --link --from=stargz-snapshotter /out/* /usr/bin/
@@ -530,7 +567,7 @@ index b64f57b..939af14 100644
  COPY --link --from=containerd /out/containerd* /usr/bin/
  COPY --link --from=cni-plugins /opt/cni/bin/bridge /opt/cni/bin/host-local /opt/cni/bin/loopback /opt/cni/bin/firewall /opt/cni/bin/dnsname /opt/cni/bin/
  COPY --link hack/fixtures/cni.json /etc/buildkit/cni.json
-@@ -261,13 +268,17 @@ FROM integration-tests AS dev-env
+@@ -261,13 +279,17 @@ FROM integration-tests AS dev-env
  VOLUME /var/lib/buildkit
  
  # Rootless mode.
@@ -601,6 +638,71 @@ index 0af736a..dc2cd56 100644
  		if err := mount.All(mounts, dir); err != nil {
  			return nil, nil, err
  		}
+diff --git upstream/v0.11/canonical_utils/artifactory/fetch_from_artifactory.py origin/v0.11/canonical_utils/artifactory/fetch_from_artifactory.py
+new file mode 100755
+index 0000000..d2a2706
+--- /dev/null
++++ origin/v0.11/canonical_utils/artifactory/fetch_from_artifactory.py
+@@ -0,0 +1,51 @@
++#!/usr/bin/env python3
++"""
++USAGE EXAMPLE:
++    ./fetch_from_artifactory.py --artifactory-url url.txt \
++        --artifact-path '/foo/pool/b/bar/artifact.tar.gz' \
++            --token-file token_file --output-file foo.tar.gz
++"""
++import argparse
++from artifactory import ArtifactoryPath
++
++
++parser = argparse.ArgumentParser()
++parser.add_argument(
++    "--artifact-path",
++    help="Path, as an URL suffix to --artifact-url, of the artifact to fetch",
++    required=True,
++)
++parser.add_argument(
++    "--artifactory-url-file",
++    help="Text file with the Artifactory base URL in plain text",
++    required=True,
++)
++parser.add_argument(
++    "--token-file",
++    help="Token file with the plain text token for Artifactory authentication",
++    required=True,
++)
++parser.add_argument(
++    "--output-file",
++    help="Where to save the artifact",
++    required=False,
++)
++
++args = parser.parse_args()
++with open(args.token_file) as token_file:
++    token = token_file.read().splitlines()[0]
++
++with open(args.artifactory_url_file) as url_file:
++    base_url = url_file.read().splitlines()[0].rstrip("/")
++    
++full_url = base_url + "/" + args.artifact_path
++path = ArtifactoryPath(full_url, token=token)
++
++output_file = args.output_file
++if not output_file:
++    output_file = args.artifact_path.rstrip("/").split("/")[-1]
++
++with path.open() as fd, open(output_file, "wb") as out:
++    out.write(fd.read())
++
++print(f"Fetched {output_file} from Artifactory")
+diff --git upstream/v0.11/canonical_utils/artifactory/requirements.txt origin/v0.11/canonical_utils/artifactory/requirements.txt
+new file mode 100644
+index 0000000..cf69859
+--- /dev/null
++++ origin/v0.11/canonical_utils/artifactory/requirements.txt
+@@ -0,0 +1 @@
++dohq-artifactory
+\ No newline at end of file
 diff --git upstream/v0.11/client/build_test.go origin/v0.11/client/build_test.go
 index 763207c..1376c15 100644
 --- upstream/v0.11/client/build_test.go
