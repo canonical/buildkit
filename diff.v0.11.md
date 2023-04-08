@@ -1357,6 +1357,47 @@ index 09aa198..c8310cc 100644
  	})
  
  	h.mu.Lock()
+diff --git upstream/v0.11/solver/llbsolver/ops/file.go origin/v0.11/solver/llbsolver/ops/file.go
+index 4f80ddf..7bbb327 100644
+--- upstream/v0.11/solver/llbsolver/ops/file.go
++++ origin/v0.11/solver/llbsolver/ops/file.go
+@@ -30,8 +30,9 @@ const fileCacheType = "buildkit.file.v0"
+ 
+ type fileOp struct {
+ 	op          *pb.FileOp
++	md          cache.MetadataStore
+ 	w           worker.Worker
+-	refManager  *file.RefManager
++	solver      *FileOpSolver
+ 	numInputs   int
+ 	parallelism *semaphore.Weighted
+ }
+@@ -40,12 +41,12 @@ func NewFileOp(v solver.Vertex, op *pb.Op_File, cm cache.Manager, parallelism *s
+ 	if err := opsutils.Validate(&pb.Op{Op: op}); err != nil {
+ 		return nil, err
+ 	}
+-	refManager := file.NewRefManager(cm, v.Name())
+ 	return &fileOp{
+ 		op:          op.File,
+-		w:           w,
+-		refManager:  refManager,
++		md:          cm,
+ 		numInputs:   len(v.Inputs()),
++		w:           w,
++		solver:      NewFileOpSolver(w, &file.Backend{}, file.NewRefManager(cm, v.Name())),
+ 		parallelism: parallelism,
+ 	}, nil
+ }
+@@ -167,8 +168,7 @@ func (f *fileOp) Exec(ctx context.Context, g session.Group, inputs []solver.Resu
+ 		inpRefs = append(inpRefs, workerRef.ImmutableRef)
+ 	}
+ 
+-	fs := NewFileOpSolver(f.w, &file.Backend{}, f.refManager)
+-	outs, err := fs.Solve(ctx, inpRefs, f.op.Actions, g)
++	outs, err := f.solver.Solve(ctx, inpRefs, f.op.Actions, g)
+ 	if err != nil {
+ 		return nil, err
+ 	}
 diff --git upstream/v0.11/solver/llbsolver/solver.go origin/v0.11/solver/llbsolver/solver.go
 index d65a9e6..2f7ba61 100644
 --- upstream/v0.11/solver/llbsolver/solver.go
