@@ -612,6 +612,27 @@ index 813fcdf..70ab905 100644
  
  install: FORCE
  	mkdir -p $(DESTDIR)$(bindir)
+diff --git upstream/v0.11/cache/manager_test.go origin/v0.11/cache/manager_test.go
+index 5c71246..cd58a40 100644
+--- upstream/v0.11/cache/manager_test.go
++++ origin/v0.11/cache/manager_test.go
+@@ -19,7 +19,6 @@ import (
+ 	"time"
+ 
+ 	ctdcompression "github.com/containerd/containerd/archive/compression"
+-	"github.com/containerd/containerd/archive/tarheader"
+ 	"github.com/containerd/containerd/content"
+ 	"github.com/containerd/containerd/content/local"
+ 	"github.com/containerd/containerd/diff/apply"
+@@ -2598,7 +2597,7 @@ func fileToBlob(file *os.File, compress bool) ([]byte, ocispecs.Descriptor, erro
+ 		return nil, ocispecs.Descriptor{}, err
+ 	}
+ 
+-	fi, err := tarheader.FileInfoHeaderNoLookups(info, "")
++	fi, err := tar.FileInfoHeader(info, "")
+ 	if err != nil {
+ 		return nil, ocispecs.Descriptor{}, err
+ 	}
 diff --git upstream/v0.11/cache/refs.go origin/v0.11/cache/refs.go
 index 0af736a..dc2cd56 100644
 --- upstream/v0.11/cache/refs.go
@@ -1200,7 +1221,7 @@ index f825b1d..94b48a7 100644
  }
  
 diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
-index 2ebcd9a..82f829c 100644
+index bb911e2..82f829c 100644
 --- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
 +++ origin/v0.11/frontend/dockerfile/dockerfile_test.go
 @@ -419,7 +419,7 @@ RUN [ "$(cat testfile)" == "contents0" ]
@@ -1235,11 +1256,14 @@ index 2ebcd9a..82f829c 100644
  	f := getFrontend(t, sb)
  
  	registry, err := sb.NewRegistry()
-@@ -6562,7 +6557,7 @@ FROM scratch
+@@ -6562,10 +6557,7 @@ FROM scratch
  COPY --from=0 / /
  `)
  
--	const expectedDigest = "sha256:9e36395384d073e711102b13bd0ba4b779ef6afbaf5cadeb77fe77dba8967d1f"
+-	// note that this digest differs from the one in master, due to
+-	// commit a89f482dcb3428c0297f39474eebd7de15e4792a not being included
+-	// in this branch.
+-	const expectedDigest = "sha256:e26093cc8a7524089a1d0136457e6c09a34176e2b2efcf99ac471baa729c7dc9"
 +	const expectedDigest = "sha256:0ae0bfad915535a615d42aa5313d15ed65902ea1744d7adc7fe4497dea8b33e3"
  
  	dir, err := integration.Tmpdir(
@@ -1262,6 +1286,123 @@ index 252617f..1b000a8 100644
  			}
  
  			if file := msg.GetFile(); file != nil {
+diff --git upstream/v0.11/go.mod origin/v0.11/go.mod
+index b766ca6..d2c1cec 100644
+--- upstream/v0.11/go.mod
++++ origin/v0.11/go.mod
+@@ -6,7 +6,7 @@ require (
+ 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.1.0
+ 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
+ 	github.com/Microsoft/go-winio v0.5.2
+-	github.com/Microsoft/hcsshim v0.9.8
++	github.com/Microsoft/hcsshim v0.9.6
+ 	github.com/agext/levenshtein v1.2.3
+ 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
+ 	github.com/aws/aws-sdk-go-v2/config v1.15.5
+@@ -15,7 +15,7 @@ require (
+ 	github.com/aws/aws-sdk-go-v2/service/s3 v1.26.9
+ 	github.com/aws/smithy-go v1.11.2
+ 	github.com/containerd/console v1.0.3
+-	github.com/containerd/containerd v1.6.20
++	github.com/containerd/containerd v1.6.18
+ 	github.com/containerd/continuity v0.3.0
+ 	github.com/containerd/fuse-overlayfs-snapshotter v1.0.2
+ 	github.com/containerd/go-cni v1.1.6
+@@ -49,8 +49,8 @@ require (
+ 	github.com/moby/sys/signal v0.7.0
+ 	github.com/morikuni/aec v1.0.0
+ 	github.com/opencontainers/go-digest v1.0.0
+-	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
+-	github.com/opencontainers/runc v1.1.5
++	github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1
++	github.com/opencontainers/runc v1.1.3
+ 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
+ 	github.com/opencontainers/selinux v1.10.2
+ 	github.com/package-url/packageurl-go v0.1.1-0.20220428063043-89078438f170
+@@ -111,7 +111,7 @@ require (
+ 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+ 	github.com/containerd/cgroups v1.0.4 // indirect
+ 	github.com/containerd/fifo v1.0.0 // indirect
+-	github.com/containerd/ttrpc v1.1.1 // indirect
++	github.com/containerd/ttrpc v1.1.0 // indirect
+ 	github.com/containernetworking/cni v1.1.1 // indirect
+ 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+ 	github.com/davecgh/go-spew v1.1.1 // indirect
+diff --git upstream/v0.11/go.sum origin/v0.11/go.sum
+index ac08571..9cb25f9 100644
+--- upstream/v0.11/go.sum
++++ origin/v0.11/go.sum
+@@ -167,8 +167,8 @@ github.com/Microsoft/hcsshim v0.8.21/go.mod h1:+w2gRZ5ReXQhFOrvSQeNfhrYB/dg3oDwT
+ github.com/Microsoft/hcsshim v0.8.23/go.mod h1:4zegtUJth7lAvFyc6cH2gGQ5B3OFQim01nnU2M8jKDg=
+ github.com/Microsoft/hcsshim v0.9.2/go.mod h1:7pLA8lDk46WKDWlVsENo92gC0XFa8rbKfyFRBqxEbCc=
+ github.com/Microsoft/hcsshim v0.9.4/go.mod h1:7pLA8lDk46WKDWlVsENo92gC0XFa8rbKfyFRBqxEbCc=
+-github.com/Microsoft/hcsshim v0.9.8 h1:lf7xxK2+Ikbj9sVf2QZsouGjRjEp2STj1yDHgoVtU5k=
+-github.com/Microsoft/hcsshim v0.9.8/go.mod h1:7pLA8lDk46WKDWlVsENo92gC0XFa8rbKfyFRBqxEbCc=
++github.com/Microsoft/hcsshim v0.9.6 h1:VwnDOgLeoi2du6dAznfmspNqTiwczvjv4K7NxuY9jsY=
++github.com/Microsoft/hcsshim v0.9.6/go.mod h1:7pLA8lDk46WKDWlVsENo92gC0XFa8rbKfyFRBqxEbCc=
+ github.com/Microsoft/hcsshim/test v0.0.0-20200826032352-301c83a30e7c/go.mod h1:30A5igQ91GEmhYJF8TaRP79pMBOYynRsyOByfVV0dU4=
+ github.com/Microsoft/hcsshim/test v0.0.0-20201218223536-d3e5debf77da/go.mod h1:5hlzMzRKMLyo42nCZ9oml8AdTlq/0cvIaBv6tK1RehU=
+ github.com/Microsoft/hcsshim/test v0.0.0-20210227013316-43a75bb4edd3/go.mod h1:mw7qgWloBUl75W/gVH3cQszUg1+gUITj7D6NY7ywVnY=
+@@ -370,8 +370,8 @@ github.com/containerd/containerd v1.5.7/go.mod h1:gyvv6+ugqY25TiXxcZC3L5yOeYgEw0
+ github.com/containerd/containerd v1.5.8/go.mod h1:YdFSv5bTFLpG2HIYmfqDpSYYTDX+mc5qtSuYx1YUb/s=
+ github.com/containerd/containerd v1.6.1/go.mod h1:1nJz5xCZPusx6jJU8Frfct988y0NpumIq9ODB0kLtoE=
+ github.com/containerd/containerd v1.6.9/go.mod h1:XVicUvkxOrftE2Q1YWUXgZwkkAxwQYNOFzYWvfVfEfQ=
+-github.com/containerd/containerd v1.6.20 h1:+itjwpdqXpzHB/QAiWc/BZCjjVfcNgw69w/oIeF4Oy0=
+-github.com/containerd/containerd v1.6.20/go.mod h1:apei1/i5Ux2FzrK6+DM/suEsGuK/MeVOfy8tR2q7Wnw=
++github.com/containerd/containerd v1.6.18 h1:qZbsLvmyu+Vlty0/Ex5xc0z2YtKpIsb5n45mAMI+2Ns=
++github.com/containerd/containerd v1.6.18/go.mod h1:1RdCUu95+gc2v9t3IL+zIlpClSmew7/0YS8O5eQZrOw=
+ github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
+ github.com/containerd/continuity v0.0.0-20190815185530-f2a389ac0a02/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
+ github.com/containerd/continuity v0.0.0-20191127005431-f65d91d395eb/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
+@@ -425,9 +425,8 @@ github.com/containerd/ttrpc v0.0.0-20190828172938-92c8520ef9f8/go.mod h1:PvCDdDG
+ github.com/containerd/ttrpc v0.0.0-20191028202541-4f1b8fe65a5c/go.mod h1:LPm1u0xBw8r8NOKoOdNMeVHSawSsltak+Ihv+etqsE8=
+ github.com/containerd/ttrpc v1.0.1/go.mod h1:UAxOpgT9ziI0gJrmKvgcZivgxOp8iFPSk8httJEt98Y=
+ github.com/containerd/ttrpc v1.0.2/go.mod h1:UAxOpgT9ziI0gJrmKvgcZivgxOp8iFPSk8httJEt98Y=
++github.com/containerd/ttrpc v1.1.0 h1:GbtyLRxb0gOLR0TYQWt3O6B0NvT8tMdorEHqIQo/lWI=
+ github.com/containerd/ttrpc v1.1.0/go.mod h1:XX4ZTnoOId4HklF4edwc4DcqskFZuvXB1Evzy5KFQpQ=
+-github.com/containerd/ttrpc v1.1.1 h1:NoRHS/z8UiHhpY1w0xcOqoJDGf2DHyzXrF0H4l5AE8c=
+-github.com/containerd/ttrpc v1.1.1/go.mod h1:XX4ZTnoOId4HklF4edwc4DcqskFZuvXB1Evzy5KFQpQ=
+ github.com/containerd/typeurl v0.0.0-20180627222232-a93fcdb778cd/go.mod h1:Cm3kwCdlkCfMSHURc+r6fwoGH6/F1hH3S4sg0rLFWPc=
+ github.com/containerd/typeurl v0.0.0-20190911142611-5eb25027c9fd/go.mod h1:GeKYzf2pQcqv7tJ0AoCuuhtnqhva5LNU3U+OyKxxJpk=
+ github.com/containerd/typeurl v1.0.1/go.mod h1:TB1hUtrpaiO88KEK56ijojHS1+NeF0izUACaJW2mdXg=
+@@ -1136,8 +1135,8 @@ github.com/opencontainers/image-spec v1.0.1/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zM
+ github.com/opencontainers/image-spec v1.0.2-0.20211117181255-693428a734f5/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
+ github.com/opencontainers/image-spec v1.0.2/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
+ github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
+-github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b h1:YWuSjZCQAPM8UUBLkYUk1e+rZcvWHJmFb6i6rM44Xs8=
+-github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b/go.mod h1:3OVijpioIKYWTqjiG0zfF6wvoJ4fAXGbjdZuI2NgsRQ=
++github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1 h1:9iFHD5Kt9hkOfeawBNiEeEaV7bmC4/Z5wJp8E9BptMs=
++github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1/go.mod h1:K/JAU0m27RFhDRX4PcFdIKntROP6y5Ed6O91aZYDQfs=
+ github.com/opencontainers/runc v0.0.0-20190115041553-12f6a991201f/go.mod h1:qT5XzbpPznkRYVz/mWwUaVBUv2rmF59PVA73FjuZG0U=
+ github.com/opencontainers/runc v0.1.1/go.mod h1:qT5XzbpPznkRYVz/mWwUaVBUv2rmF59PVA73FjuZG0U=
+ github.com/opencontainers/runc v1.0.0-rc10/go.mod h1:qT5XzbpPznkRYVz/mWwUaVBUv2rmF59PVA73FjuZG0U=
+@@ -1148,8 +1147,8 @@ github.com/opencontainers/runc v1.0.0-rc93/go.mod h1:3NOsor4w32B2tC0Zbl8Knk4Wg84
+ github.com/opencontainers/runc v1.0.2/go.mod h1:aTaHFFwQXuA71CiyxOdFFIorAoemI04suvGRQFzWTD0=
+ github.com/opencontainers/runc v1.1.0/go.mod h1:Tj1hFw6eFWp/o33uxGf5yF2BX5yz2Z6iptFpuvbbKqc=
+ github.com/opencontainers/runc v1.1.2/go.mod h1:Tj1hFw6eFWp/o33uxGf5yF2BX5yz2Z6iptFpuvbbKqc=
+-github.com/opencontainers/runc v1.1.5 h1:L44KXEpKmfWDcS02aeGm8QNTFXTo2D+8MYGDIJ/GDEs=
+-github.com/opencontainers/runc v1.1.5/go.mod h1:1J5XiS+vdZ3wCyZybsuxXZWGrgSr8fFJHLXuG2PsnNg=
++github.com/opencontainers/runc v1.1.3 h1:vIXrkId+0/J2Ymu2m7VjGvbSlAId9XNRPhn2p4b+d8w=
++github.com/opencontainers/runc v1.1.3/go.mod h1:1J5XiS+vdZ3wCyZybsuxXZWGrgSr8fFJHLXuG2PsnNg=
+ github.com/opencontainers/runtime-spec v0.1.2-0.20190507144316-5b71a03e2700/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
+ github.com/opencontainers/runtime-spec v1.0.1/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
+ github.com/opencontainers/runtime-spec v1.0.2-0.20190207185410-29686dbc5559/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
+@@ -1264,6 +1263,7 @@ github.com/rs/xid v1.2.1/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
+ github.com/rs/xid v1.4.0/go.mod h1:trrq9SKmegXys3aeAKXMUTdJsYXVwGY3RLcfgqegfbg=
+ github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c/go.mod h1:DM5xW0nvfNNm2uytzsvhI3OnX8uzaRAg8UX/CnDqbto=
+ github.com/russross/blackfriday v1.5.2/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR/rfWxYHBV53g=
++github.com/russross/blackfriday v1.6.0/go.mod h1:ti0ldHuxg49ri4ksnFxlkCfN+hvslNlmVHqNRXXJNAY=
+ github.com/russross/blackfriday/v2 v2.0.1/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
+ github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf35Ld67mk=
+ github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
+@@ -1429,6 +1429,7 @@ github.com/xanzy/go-gitlab v0.32.0/go.mod h1:sPLojNBn68fMUWSxIJtdVVIP8uSBYqesTfD
+ github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=
+ github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415/go.mod h1:GwrjFmJcFw6At/Gs6z4yjiIwzuJ1/+UwLxMQDVQXShQ=
+ github.com/xeipuuv/gojsonschema v0.0.0-20180618132009-1d523034197f/go.mod h1:5yf86TLmAcydyeJq5YvxkGPE2fm/u4myDekKRoLuqhs=
++github.com/xeipuuv/gojsonschema v1.2.0/go.mod h1:anYRn/JVcOK2ZgGU+IjEV4nwlhoK5sQluxsYJ78Id3Y=
+ github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8/go.mod h1:HUYIGzjTL3rfEspMxjDjgmT5uz5wzYJKVo23qUhYTos=
+ github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
+ github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 diff --git upstream/v0.11/hack/images origin/v0.11/hack/images
 index d1315e6..674a77b 100755
 --- upstream/v0.11/hack/images
@@ -1759,4 +1900,1088 @@ index 1289bb5..8eb90cd 100644
  }
  
  func CheckFeatureCompat(t *testing.T, sb Sandbox, reason ...string) {
+diff --git upstream/v0.11/vendor/github.com/Microsoft/hcsshim/internal/hcs/process.go origin/v0.11/vendor/github.com/Microsoft/hcsshim/internal/hcs/process.go
+index 78490d6..f460592 100644
+--- upstream/v0.11/vendor/github.com/Microsoft/hcsshim/internal/hcs/process.go
++++ origin/v0.11/vendor/github.com/Microsoft/hcsshim/internal/hcs/process.go
+@@ -161,39 +161,7 @@ func (process *Process) Kill(ctx context.Context) (bool, error) {
+ 		return true, nil
+ 	}
+ 
+-	// HCS serializes the signals sent to a target pid per compute system handle.
+-	// To avoid SIGKILL being serialized behind other signals, we open a new compute
+-	// system handle to deliver the kill signal.
+-	// If the calls to opening a new compute system handle fail, we forcefully
+-	// terminate the container itself so that no container is left behind
+-	hcsSystem, err := OpenComputeSystem(ctx, process.system.id)
+-	if err != nil {
+-		// log error and force termination of container
+-		log.G(ctx).WithField("err", err).Error("OpenComputeSystem() call failed")
+-		err = process.system.Terminate(ctx)
+-		// if the Terminate() call itself ever failed, log and return error
+-		if err != nil {
+-			log.G(ctx).WithField("err", err).Error("Terminate() call failed")
+-			return false, err
+-		}
+-		process.system.Close()
+-		return true, nil
+-	}
+-	defer hcsSystem.Close()
+-
+-	newProcessHandle, err := hcsSystem.OpenProcess(ctx, process.Pid())
+-	if err != nil {
+-		// Return true only if the target process has either already
+-		// exited, or does not exist.
+-		if IsAlreadyStopped(err) {
+-			return true, nil
+-		} else {
+-			return false, err
+-		}
+-	}
+-	defer newProcessHandle.Close()
+-
+-	resultJSON, err := vmcompute.HcsTerminateProcess(ctx, newProcessHandle.handle)
++	resultJSON, err := vmcompute.HcsTerminateProcess(ctx, process.handle)
+ 	if err != nil {
+ 		// We still need to check these two cases, as processes may still be killed by an
+ 		// external actor (human operator, OOM, random script etc).
+@@ -217,9 +185,9 @@ func (process *Process) Kill(ctx context.Context) (bool, error) {
+ 		}
+ 	}
+ 	events := processHcsResult(ctx, resultJSON)
+-	delivered, err := newProcessHandle.processSignalResult(ctx, err)
++	delivered, err := process.processSignalResult(ctx, err)
+ 	if err != nil {
+-		err = makeProcessError(newProcessHandle, operation, err, events)
++		err = makeProcessError(process, operation, err, events)
+ 	}
+ 
+ 	process.killSignalDelivered = delivered
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/.golangci.yml origin/v0.11/vendor/github.com/containerd/containerd/.golangci.yml
+index e162f0a..4bf8459 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/.golangci.yml
++++ origin/v0.11/vendor/github.com/containerd/containerd/.golangci.yml
+@@ -1,55 +1,27 @@
+ linters:
+   enable:
+-    - exportloopref # Checks for pointers to enclosing loop variables
++    - structcheck
++    - varcheck
++    - staticcheck
++    - unconvert
+     - gofmt
+     - goimports
+-    - gosec
+-    - ineffassign
+-    - misspell
+-    - nolintlint
+     - revive
+-    - staticcheck
+-    - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
+-    - unconvert
+-    - unused
++    - ineffassign
+     - vet
+-    - dupword # Checks for duplicate words in the source code
++    - unused
++    - misspell
+   disable:
+     - errcheck
+ 
+ issues:
+   include:
+     - EXC0002
+-  max-issues-per-linter: 0
+-  max-same-issues: 0
+-
+-  # Only using / doesn't work due to https://github.com/golangci/golangci-lint/issues/1398.
+-  exclude-rules:
+-    - path: 'archive[\\/]tarheader[\\/]'
+-      # conversion is necessary on Linux, unnecessary on macOS
+-      text: "unnecessary conversion"
+-
+-linters-settings:
+-  gosec:
+-    # The following issues surfaced when `gosec` linter
+-    # was enabled. They are temporarily excluded to unblock
+-    # the existing workflow, but still to be addressed by
+-    # future works.
+-    excludes:
+-      - G204
+-      - G305
+-      - G306
+-      - G402
+-      - G404
+ 
+ run:
+   timeout: 8m
+   skip-dirs:
+     - api
+-    - cluster
+     - design
+     - docs
+     - docs/man
+-    - releases
+-    - reports
+-    - test # e2e scripts
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/Vagrantfile origin/v0.11/vendor/github.com/containerd/containerd/Vagrantfile
+index a4a05ed..e81bfc2 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/Vagrantfile
++++ origin/v0.11/vendor/github.com/containerd/containerd/Vagrantfile
+@@ -93,7 +93,7 @@ EOF
+   config.vm.provision "install-golang", type: "shell", run: "once" do |sh|
+     sh.upload_path = "/tmp/vagrant-install-golang"
+     sh.env = {
+-        'GO_VERSION': ENV['GO_VERSION'] || "1.19.7",
++        'GO_VERSION': ENV['GO_VERSION'] || "1.19.6",
+     }
+     sh.inline = <<~SHELL
+         #!/usr/bin/env bash
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/api/services/containers/v1/containers.pb.go origin/v0.11/vendor/github.com/containerd/containerd/api/services/containers/v1/containers.pb.go
+index 8c84d9c..af56c7d 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/api/services/containers/v1/containers.pb.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/api/services/containers/v1/containers.pb.go
+@@ -246,7 +246,7 @@ type ListContainersRequest struct {
+ 	// filters. Expanded, containers that match the following will be
+ 	// returned:
+ 	//
+-	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
++	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+ 	//
+ 	// If filters is zero-length or nil, all items will be returned.
+ 	Filters              []string `protobuf:"bytes,1,rep,name=filters,proto3" json:"filters,omitempty"`
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/api/services/containers/v1/containers.proto origin/v0.11/vendor/github.com/containerd/containerd/api/services/containers/v1/containers.proto
+index eb4068e..36ab177 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/api/services/containers/v1/containers.proto
++++ origin/v0.11/vendor/github.com/containerd/containerd/api/services/containers/v1/containers.proto
+@@ -132,7 +132,7 @@ message ListContainersRequest {
+ 	// filters. Expanded, containers that match the following will be
+ 	// returned:
+ 	//
+-	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
++	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+ 	//
+ 	// If filters is zero-length or nil, all items will be returned.
+ 	repeated string filters = 1;
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/api/services/content/v1/content.proto origin/v0.11/vendor/github.com/containerd/containerd/api/services/content/v1/content.proto
+index f43b649..b33ea5b 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/api/services/content/v1/content.proto
++++ origin/v0.11/vendor/github.com/containerd/containerd/api/services/content/v1/content.proto
+@@ -141,7 +141,7 @@ message ListContentRequest {
+ 	// filters. Expanded, containers that match the following will be
+ 	// returned:
+ 	//
+-	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
++	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+ 	//
+ 	// If filters is zero-length or nil, all items will be returned.
+ 	repeated string filters = 1;
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/api/services/images/v1/images.pb.go origin/v0.11/vendor/github.com/containerd/containerd/api/services/images/v1/images.pb.go
+index ee170f2..de08cc0 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/api/services/images/v1/images.pb.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/api/services/images/v1/images.pb.go
+@@ -336,7 +336,7 @@ type ListImagesRequest struct {
+ 	// filters. Expanded, images that match the following will be
+ 	// returned:
+ 	//
+-	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
++	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+ 	//
+ 	// If filters is zero-length or nil, all items will be returned.
+ 	Filters              []string `protobuf:"bytes,1,rep,name=filters,proto3" json:"filters,omitempty"`
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/api/services/images/v1/images.proto origin/v0.11/vendor/github.com/containerd/containerd/api/services/images/v1/images.proto
+index dee4503..338f4fb 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/api/services/images/v1/images.proto
++++ origin/v0.11/vendor/github.com/containerd/containerd/api/services/images/v1/images.proto
+@@ -119,7 +119,7 @@ message ListImagesRequest {
+ 	// filters. Expanded, images that match the following will be
+ 	// returned:
+ 	//
+-	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
++	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+ 	//
+ 	// If filters is zero-length or nil, all items will be returned.
+ 	repeated string filters = 1;
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/api/services/introspection/v1/introspection.pb.go origin/v0.11/vendor/github.com/containerd/containerd/api/services/introspection/v1/introspection.pb.go
+index 65e015d..d23c8b6 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/api/services/introspection/v1/introspection.pb.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/api/services/introspection/v1/introspection.pb.go
+@@ -115,7 +115,7 @@ type PluginsRequest struct {
+ 	// filters. Expanded, plugins that match the following will be
+ 	// returned:
+ 	//
+-	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
++	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+ 	//
+ 	// If filters is zero-length or nil, all items will be returned.
+ 	Filters              []string `protobuf:"bytes,1,rep,name=filters,proto3" json:"filters,omitempty"`
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/api/services/introspection/v1/introspection.proto origin/v0.11/vendor/github.com/containerd/containerd/api/services/introspection/v1/introspection.proto
+index 8427a06..65a8bc2 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/api/services/introspection/v1/introspection.proto
++++ origin/v0.11/vendor/github.com/containerd/containerd/api/services/introspection/v1/introspection.proto
+@@ -89,7 +89,7 @@ message PluginsRequest {
+ 	// filters. Expanded, plugins that match the following will be
+ 	// returned:
+ 	//
+-	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
++	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+ 	//
+ 	// If filters is zero-length or nil, all items will be returned.
+ 	repeated string filters = 1;
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.pb.go origin/v0.11/vendor/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.pb.go
+index e8c6664..046c97b 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.pb.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.pb.go
+@@ -620,7 +620,7 @@ type ListSnapshotsRequest struct {
+ 	// filters. Expanded, images that match the following will be
+ 	// returned:
+ 	//
+-	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
++	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+ 	//
+ 	// If filters is zero-length or nil, all items will be returned.
+ 	Filters              []string `protobuf:"bytes,2,rep,name=filters,proto3" json:"filters,omitempty"`
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto origin/v0.11/vendor/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto
+index 9bbef14..dfb8ff1 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto
++++ origin/v0.11/vendor/github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto
+@@ -158,7 +158,7 @@ message ListSnapshotsRequest{
+ 	// filters. Expanded, images that match the following will be
+ 	// returned:
+ 	//
+-	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
++	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+ 	//
+ 	// If filters is zero-length or nil, all items will be returned.
+ 	repeated string filters = 2;
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/archive/tar.go origin/v0.11/vendor/github.com/containerd/containerd/archive/tar.go
+index cff0edc..44b7949 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/archive/tar.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/archive/tar.go
+@@ -30,7 +30,6 @@ import (
+ 	"syscall"
+ 	"time"
+ 
+-	"github.com/containerd/containerd/archive/tarheader"
+ 	"github.com/containerd/containerd/log"
+ 	"github.com/containerd/containerd/pkg/userns"
+ 	"github.com/containerd/continuity/fs"
+@@ -555,8 +554,7 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
+ 			}
+ 		}
+ 
+-		// Use FileInfoHeaderNoLookups to avoid propagating user names and group names from the host
+-		hdr, err := tarheader.FileInfoHeaderNoLookups(f, link)
++		hdr, err := tar.FileInfoHeader(f, link)
+ 		if err != nil {
+ 			return err
+ 		}
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/archive/tar_unix.go origin/v0.11/vendor/github.com/containerd/containerd/archive/tar_unix.go
+index d84dfd8..854afcf 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/archive/tar_unix.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/archive/tar_unix.go
+@@ -62,7 +62,8 @@ func setHeaderForSpecialDevice(hdr *tar.Header, name string, fi os.FileInfo) err
+ 		return errors.New("unsupported stat type")
+ 	}
+ 
+-	rdev := uint64(s.Rdev) //nolint:nolintlint,unconvert // rdev is int32 on darwin/bsd, int64 on linux/solaris
++	// Rdev is int32 on darwin/bsd, int64 on linux/solaris
++	rdev := uint64(s.Rdev) //nolint:unconvert
+ 
+ 	// Currently go does not fill in the major/minors
+ 	if s.Mode&syscall.S_IFBLK != 0 ||
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/archive/tarheader/tarheader.go origin/v0.11/vendor/github.com/containerd/containerd/archive/tarheader/tarheader.go
+deleted file mode 100644
+index 2f93842..0000000
+--- upstream/v0.11/vendor/github.com/containerd/containerd/archive/tarheader/tarheader.go
++++ /dev/null
+@@ -1,82 +0,0 @@
+-/*
+-   Copyright The containerd Authors.
+-
+-   Licensed under the Apache License, Version 2.0 (the "License");
+-   you may not use this file except in compliance with the License.
+-   You may obtain a copy of the License at
+-
+-       http://www.apache.org/licenses/LICENSE-2.0
+-
+-   Unless required by applicable law or agreed to in writing, software
+-   distributed under the License is distributed on an "AS IS" BASIS,
+-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-   See the License for the specific language governing permissions and
+-   limitations under the License.
+-*/
+-
+-/*
+-   Portions from https://github.com/moby/moby/blob/v23.0.1/pkg/archive/archive.go#L419-L464
+-   Copyright (C) Docker/Moby authors.
+-   Licensed under the Apache License, Version 2.0
+-   NOTICE: https://github.com/moby/moby/blob/v23.0.1/NOTICE
+-*/
+-
+-package tarheader
+-
+-import (
+-	"archive/tar"
+-	"os"
+-)
+-
+-// nosysFileInfo hides the system-dependent info of the wrapped FileInfo to
+-// prevent tar.FileInfoHeader from introspecting it and potentially calling into
+-// glibc.
+-//
+-// From https://github.com/moby/moby/blob/v23.0.1/pkg/archive/archive.go#L419-L434 .
+-type nosysFileInfo struct {
+-	os.FileInfo
+-}
+-
+-func (fi nosysFileInfo) Sys() interface{} {
+-	// A Sys value of type *tar.Header is safe as it is system-independent.
+-	// The tar.FileInfoHeader function copies the fields into the returned
+-	// header without performing any OS lookups.
+-	if sys, ok := fi.FileInfo.Sys().(*tar.Header); ok {
+-		return sys
+-	}
+-	return nil
+-}
+-
+-// sysStat, if non-nil, populates hdr from system-dependent fields of fi.
+-//
+-// From https://github.com/moby/moby/blob/v23.0.1/pkg/archive/archive.go#L436-L437 .
+-var sysStat func(fi os.FileInfo, hdr *tar.Header) error
+-
+-// FileInfoHeaderNoLookups creates a partially-populated tar.Header from fi.
+-//
+-// Compared to the archive/tar.FileInfoHeader function, this function is safe to
+-// call from a chrooted process as it does not populate fields which would
+-// require operating system lookups. It behaves identically to
+-// tar.FileInfoHeader when fi is a FileInfo value returned from
+-// tar.Header.FileInfo().
+-//
+-// When fi is a FileInfo for a native file, such as returned from os.Stat() and
+-// os.Lstat(), the returned Header value differs from one returned from
+-// tar.FileInfoHeader in the following ways. The Uname and Gname fields are not
+-// set as OS lookups would be required to populate them. The AccessTime and
+-// ChangeTime fields are not currently set (not yet implemented) although that
+-// is subject to change. Callers which require the AccessTime or ChangeTime
+-// fields to be zeroed should explicitly zero them out in the returned Header
+-// value to avoid any compatibility issues in the future.
+-//
+-// From https://github.com/moby/moby/blob/v23.0.1/pkg/archive/archive.go#L439-L464 .
+-func FileInfoHeaderNoLookups(fi os.FileInfo, link string) (*tar.Header, error) {
+-	hdr, err := tar.FileInfoHeader(nosysFileInfo{fi}, link)
+-	if err != nil {
+-		return nil, err
+-	}
+-	if sysStat != nil {
+-		return hdr, sysStat(fi, hdr)
+-	}
+-	return hdr, nil
+-}
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/archive/tarheader/tarheader_unix.go origin/v0.11/vendor/github.com/containerd/containerd/archive/tarheader/tarheader_unix.go
+deleted file mode 100644
+index 98ad8f9..0000000
+--- upstream/v0.11/vendor/github.com/containerd/containerd/archive/tarheader/tarheader_unix.go
++++ /dev/null
+@@ -1,59 +0,0 @@
+-//go:build !windows
+-
+-/*
+-   Copyright The containerd Authors.
+-
+-   Licensed under the Apache License, Version 2.0 (the "License");
+-   you may not use this file except in compliance with the License.
+-   You may obtain a copy of the License at
+-
+-       http://www.apache.org/licenses/LICENSE-2.0
+-
+-   Unless required by applicable law or agreed to in writing, software
+-   distributed under the License is distributed on an "AS IS" BASIS,
+-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-   See the License for the specific language governing permissions and
+-   limitations under the License.
+-*/
+-
+-/*
+-   Portions from https://github.com/moby/moby/blob/v23.0.1/pkg/archive/archive_unix.go#L52-L70
+-   Copyright (C) Docker/Moby authors.
+-   Licensed under the Apache License, Version 2.0
+-   NOTICE: https://github.com/moby/moby/blob/v23.0.1/NOTICE
+-*/
+-
+-package tarheader
+-
+-import (
+-	"archive/tar"
+-	"os"
+-	"syscall"
+-
+-	"golang.org/x/sys/unix"
+-)
+-
+-func init() {
+-	sysStat = statUnix
+-}
+-
+-// statUnix populates hdr from system-dependent fields of fi without performing
+-// any OS lookups.
+-// From https://github.com/moby/moby/blob/v23.0.1/pkg/archive/archive_unix.go#L52-L70
+-func statUnix(fi os.FileInfo, hdr *tar.Header) error {
+-	s, ok := fi.Sys().(*syscall.Stat_t)
+-	if !ok {
+-		return nil
+-	}
+-
+-	hdr.Uid = int(s.Uid)
+-	hdr.Gid = int(s.Gid)
+-
+-	if s.Mode&unix.S_IFBLK != 0 ||
+-		s.Mode&unix.S_IFCHR != 0 {
+-		hdr.Devmajor = int64(unix.Major(uint64(s.Rdev)))
+-		hdr.Devminor = int64(unix.Minor(uint64(s.Rdev)))
+-	}
+-
+-	return nil
+-}
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/containerstore.go origin/v0.11/vendor/github.com/containerd/containerd/containerstore.go
+index bdd1c60..2756e2a 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/containerstore.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/containerstore.go
+@@ -189,7 +189,6 @@ func containersFromProto(containerspb []containersapi.Container) []containers.Co
+ 	var containers []containers.Container
+ 
+ 	for _, container := range containerspb {
+-		container := container
+ 		containers = append(containers, containerFromProto(&container))
+ 	}
+ 
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/content/local/store.go origin/v0.11/vendor/github.com/containerd/containerd/content/local/store.go
+index 0220028..f41a92d 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/content/local/store.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/content/local/store.go
+@@ -34,7 +34,7 @@ import (
+ 	"github.com/containerd/containerd/log"
+ 	"github.com/sirupsen/logrus"
+ 
+-	"github.com/opencontainers/go-digest"
++	digest "github.com/opencontainers/go-digest"
+ 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+ )
+ 
+@@ -505,7 +505,6 @@ func (s *store) resumeStatus(ref string, total int64, digester digest.Digester)
+ 		return status, fmt.Errorf("provided total differs from status: %v != %v", total, status.Total)
+ 	}
+ 
+-	//nolint:dupword
+ 	// TODO(stevvooe): slow slow slow!!, send to goroutine or use resumable hashes
+ 	fp, err := os.Open(data)
+ 	if err != nil {
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/diff/walking/differ.go origin/v0.11/vendor/github.com/containerd/containerd/diff/walking/differ.go
+index 7bfa6b8..a24c722 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/diff/walking/differ.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/diff/walking/differ.go
+@@ -87,7 +87,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
+ 
+ 	var ocidesc ocispec.Descriptor
+ 	if err := mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
+-		return mount.WithReadonlyTempMount(ctx, upper, func(upperRoot string) error {
++		return mount.WithTempMount(ctx, upper, func(upperRoot string) error {
+ 			var newReference bool
+ 			if config.Reference == "" {
+ 				newReference = true
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/image_store.go origin/v0.11/vendor/github.com/containerd/containerd/image_store.go
+index a970282..fd79e89 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/image_store.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/image_store.go
+@@ -129,7 +129,6 @@ func imagesFromProto(imagespb []imagesapi.Image) []images.Image {
+ 	var images []images.Image
+ 
+ 	for _, image := range imagespb {
+-		image := image
+ 		images = append(images, imageFromProto(&image))
+ 	}
+ 
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/images/converter/default.go origin/v0.11/vendor/github.com/containerd/containerd/images/converter/default.go
+index 65224bd..f4e944b 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/images/converter/default.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/images/converter/default.go
+@@ -132,7 +132,7 @@ func copyDesc(desc ocispec.Descriptor) *ocispec.Descriptor {
+ 	return &descCopy
+ }
+ 
+-// convertLayer converts image layers if c.layerConvertFunc is set.
++// convertLayer converts image image layers if c.layerConvertFunc is set.
+ //
+ // c.layerConvertFunc can be nil, e.g., for converting Docker media types to OCI ones.
+ func (c *defaultConverter) convertLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/metadata/boltutil/helpers.go origin/v0.11/vendor/github.com/containerd/containerd/metadata/boltutil/helpers.go
+index 4201d7b..4722a52 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/metadata/boltutil/helpers.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/metadata/boltutil/helpers.go
+@@ -162,7 +162,6 @@ func WriteExtensions(bkt *bolt.Bucket, extensions map[string]types.Any) error {
+ 	}
+ 
+ 	for name, ext := range extensions {
+-		ext := ext
+ 		p, err := proto.Marshal(&ext)
+ 		if err != nil {
+ 			return err
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/mount/mount.go origin/v0.11/vendor/github.com/containerd/containerd/mount/mount.go
+index 9dd4f32..b25556b 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/mount/mount.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/mount/mount.go
+@@ -16,10 +16,6 @@
+ 
+ package mount
+ 
+-import (
+-	"strings"
+-)
+-
+ // Mount is the lingua franca of containerd. A mount represents a
+ // serialized mount syscall. Components either emit or consume mounts.
+ type Mount struct {
+@@ -42,46 +38,3 @@ func All(mounts []Mount, target string) error {
+ 	}
+ 	return nil
+ }
+-
+-// readonlyMounts modifies the received mount options
+-// to make them readonly
+-func readonlyMounts(mounts []Mount) []Mount {
+-	for i, m := range mounts {
+-		if m.Type == "overlay" {
+-			mounts[i].Options = readonlyOverlay(m.Options)
+-			continue
+-		}
+-		opts := make([]string, 0, len(m.Options))
+-		for _, opt := range m.Options {
+-			if opt != "rw" && opt != "ro" { // skip `ro` too so we don't append it twice
+-				opts = append(opts, opt)
+-			}
+-		}
+-		opts = append(opts, "ro")
+-		mounts[i].Options = opts
+-	}
+-	return mounts
+-}
+-
+-// readonlyOverlay takes mount options for overlay mounts and makes them readonly by
+-// removing workdir and upperdir (and appending the upperdir layer to lowerdir) - see:
+-// https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html#multiple-lower-layers
+-func readonlyOverlay(opt []string) []string {
+-	out := make([]string, 0, len(opt))
+-	upper := ""
+-	for _, o := range opt {
+-		if strings.HasPrefix(o, "upperdir=") {
+-			upper = strings.TrimPrefix(o, "upperdir=")
+-		} else if !strings.HasPrefix(o, "workdir=") {
+-			out = append(out, o)
+-		}
+-	}
+-	if upper != "" {
+-		for i, o := range out {
+-			if strings.HasPrefix(o, "lowerdir=") {
+-				out[i] = "lowerdir=" + upper + ":" + strings.TrimPrefix(o, "lowerdir=")
+-			}
+-		}
+-	}
+-	return out
+-}
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/mount/temp.go origin/v0.11/vendor/github.com/containerd/containerd/mount/temp.go
+index 889d49c..13eedaf 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/mount/temp.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/mount/temp.go
+@@ -67,13 +67,6 @@ func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) erro
+ 	return nil
+ }
+ 
+-// WithReadonlyTempMount mounts the provided mounts to a temp dir as readonly,
+-// and pass the temp dir to f. The mounts are valid during the call to the f.
+-// Finally we will unmount and remove the temp dir regardless of the result of f.
+-func WithReadonlyTempMount(ctx context.Context, mounts []Mount, f func(root string) error) (err error) {
+-	return WithTempMount(ctx, readonlyMounts(mounts), f)
+-}
+-
+ func getTempDir() string {
+ 	if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
+ 		return xdg
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts.go origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts.go
+index cd251c3..3330ad1 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts.go
+@@ -76,6 +76,7 @@ func setLinux(s *Spec) {
+ 	}
+ }
+ 
++// nolint
+ func setResources(s *Spec) {
+ 	if s.Linux != nil {
+ 		if s.Linux.Resources == nil {
+@@ -89,7 +90,7 @@ func setResources(s *Spec) {
+ 	}
+ }
+ 
+-//nolint:nolintlint,unused // not used on all platforms
++// nolint
+ func setCPU(s *Spec) {
+ 	setResources(s)
+ 	if s.Linux != nil {
+@@ -228,7 +229,6 @@ func WithProcessArgs(args ...string) SpecOpts {
+ 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+ 		setProcess(s)
+ 		s.Process.Args = args
+-		s.Process.CommandLine = ""
+ 		return nil
+ 	}
+ }
+@@ -358,19 +358,17 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
+ 			return err
+ 		}
+ 		var (
+-			imageConfigBytes []byte
+-			ociimage         v1.Image
+-			config           v1.ImageConfig
++			ociimage v1.Image
++			config   v1.ImageConfig
+ 		)
+ 		switch ic.MediaType {
+ 		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
+-			var err error
+-			imageConfigBytes, err = content.ReadBlob(ctx, image.ContentStore(), ic)
++			p, err := content.ReadBlob(ctx, image.ContentStore(), ic)
+ 			if err != nil {
+ 				return err
+ 			}
+ 
+-			if err := json.Unmarshal(imageConfigBytes, &ociimage); err != nil {
++			if err := json.Unmarshal(p, &ociimage); err != nil {
+ 				return err
+ 			}
+ 			config = ociimage.Config
+@@ -407,55 +405,11 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
+ 			return WithAdditionalGIDs("root")(ctx, client, c, s)
+ 		} else if s.Windows != nil {
+ 			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
+-
+-			// To support Docker ArgsEscaped on Windows we need to combine the
+-			// image Entrypoint & (Cmd Or User Args) while taking into account
+-			// if Docker has already escaped them in the image config. When
+-			// Docker sets `ArgsEscaped==true` in the config it has pre-escaped
+-			// either Entrypoint or Cmd or both. Cmd should always be treated as
+-			// arguments appended to Entrypoint unless:
+-			//
+-			// 1. Entrypoint does not exist, in which case Cmd[0] is the
+-			// executable.
+-			//
+-			// 2. The user overrides the Cmd with User Args when activating the
+-			// container in which case those args should be appended to the
+-			// Entrypoint if it exists.
+-			//
+-			// To effectively do this we need to know if the arguments came from
+-			// the user or if the arguments came from the image config when
+-			// ArgsEscaped==true. In this case we only want to escape the
+-			// additional user args when forming the complete CommandLine. This
+-			// is safe in both cases of Entrypoint or Cmd being set because
+-			// Docker will always escape them to an array of length one. Thus in
+-			// both cases it is the "executable" portion of the command.
+-			//
+-			// In the case ArgsEscaped==false, Entrypoint or Cmd will contain
+-			// any number of entries that are all unescaped and can simply be
+-			// combined (potentially overwriting Cmd with User Args if present)
+-			// and forwarded the container start as an Args array.
+ 			cmd := config.Cmd
+-			cmdFromImage := true
+ 			if len(args) > 0 {
+ 				cmd = args
+-				cmdFromImage = false
+-			}
+-
+-			cmd = append(config.Entrypoint, cmd...)
+-			if len(cmd) == 0 {
+-				return errors.New("no arguments specified")
+-			}
+-
+-			if config.ArgsEscaped && (len(config.Entrypoint) > 0 || cmdFromImage) {
+-				s.Process.Args = nil
+-				s.Process.CommandLine = cmd[0]
+-				if len(cmd) > 1 {
+-					s.Process.CommandLine += " " + escapeAndCombineArgs(cmd[1:])
+-				}
+-			} else {
+-				s.Process.Args = cmd
+-				s.Process.CommandLine = ""
+ 			}
++			s.Process.Args = append(config.Entrypoint, cmd...)
+ 
+ 			s.Process.Cwd = config.WorkingDir
+ 			s.Process.User = specs.User{
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_linux.go origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_linux.go
+index 34651d1..4d8841e 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_linux.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_linux.go
+@@ -131,7 +131,7 @@ var WithAllCurrentCapabilities = func(ctx context.Context, client Client, c *con
+ 	return WithCapabilities(caps)(ctx, client, c, s)
+ }
+ 
+-// WithAllKnownCapabilities sets all the known linux capabilities for the container process
++// WithAllKnownCapabilities sets all the the known linux capabilities for the container process
+ var WithAllKnownCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+ 	caps := cap.Known()
+ 	return WithCapabilities(caps)(ctx, client, c, s)
+@@ -153,7 +153,3 @@ func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
+ 		return nil
+ 	}
+ }
+-
+-func escapeAndCombineArgs(args []string) string {
+-	panic("not supported")
+-}
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_nonlinux.go origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_nonlinux.go
+index ad1faa4..ec91492 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_nonlinux.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_nonlinux.go
+@@ -28,16 +28,22 @@ import (
+ 
+ // WithAllCurrentCapabilities propagates the effective capabilities of the caller process to the container process.
+ // The capability set may differ from WithAllKnownCapabilities when running in a container.
++//
++//nolint:deadcode,unused
+ var WithAllCurrentCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+ 	return WithCapabilities(nil)(ctx, client, c, s)
+ }
+ 
+-// WithAllKnownCapabilities sets all the known linux capabilities for the container process
++// WithAllKnownCapabilities sets all the the known linux capabilities for the container process
++//
++//nolint:deadcode,unused
+ var WithAllKnownCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+ 	return WithCapabilities(nil)(ctx, client, c, s)
+ }
+ 
+ // WithCPUShares sets the container's cpu shares
++//
++//nolint:deadcode,unused
+ func WithCPUShares(shares uint64) SpecOpts {
+ 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+ 		return nil
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_unix.go origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_unix.go
+index a616577..9d03091 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_unix.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_unix.go
+@@ -57,7 +57,3 @@ func WithCPUCFS(quota int64, period uint64) SpecOpts {
+ 		return nil
+ 	}
+ }
+-
+-func escapeAndCombineArgs(args []string) string {
+-	panic("not supported")
+-}
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_windows.go origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_windows.go
+index 4ddb13d..5502257 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_windows.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_windows.go
+@@ -19,12 +19,9 @@ package oci
+ import (
+ 	"context"
+ 	"errors"
+-	"strings"
+ 
+ 	"github.com/containerd/containerd/containers"
+-
+ 	specs "github.com/opencontainers/runtime-spec/specs-go"
+-	"golang.org/x/sys/windows"
+ )
+ 
+ // WithWindowsCPUCount sets the `Windows.Resources.CPU.Count` section to the
+@@ -92,11 +89,3 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
+ 		return nil
+ 	}
+ }
+-
+-func escapeAndCombineArgs(args []string) string {
+-	escaped := make([]string, len(args))
+-	for i, a := range args {
+-		escaped[i] = windows.EscapeArg(a)
+-	}
+-	return strings.Join(escaped, " ")
+-}
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/oci/utils_unix.go origin/v0.11/vendor/github.com/containerd/containerd/oci/utils_unix.go
+index 306f098..db75b0b 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/oci/utils_unix.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/oci/utils_unix.go
+@@ -127,7 +127,7 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
+ 
+ // TODO consider adding these consts to the OCI runtime-spec.
+ const (
+-	wildcardDevice = "a" //nolint:nolintlint,unused,varcheck // currently unused, but should be included when upstreaming to OCI runtime-spec.
++	wildcardDevice = "a" //nolint // currently unused, but should be included when upstreaming to OCI runtime-spec.
+ 	blockDevice    = "b"
+ 	charDevice     = "c" // or "u"
+ 	fifoDevice     = "p"
+@@ -148,7 +148,7 @@ func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
+ 	}
+ 
+ 	var (
+-		devNumber = uint64(stat.Rdev) //nolint:nolintlint,unconvert // the type is 32bit on mips.
++		devNumber = uint64(stat.Rdev) //nolint: unconvert // the type is 32bit on mips.
+ 		major     = unix.Major(devNumber)
+ 		minor     = unix.Minor(devNumber)
+ 	)
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/reference/docker/reference.go origin/v0.11/vendor/github.com/containerd/containerd/reference/docker/reference.go
+index 1ef223d..25436b6 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/reference/docker/reference.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/reference/docker/reference.go
+@@ -683,7 +683,7 @@ func splitDockerDomain(name string) (domain, remainder string) {
+ }
+ 
+ // familiarizeName returns a shortened version of the name familiar
+-// to the Docker UI. Familiar names have the default domain
++// to to the Docker UI. Familiar names have the default domain
+ // "docker.io" and "library/" repository prefix removed.
+ // For example, "docker.io/library/redis" will have the familiar
+ // name "redis" and "docker.io/dmcgowan/myapp" will be "dmcgowan/myapp".
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/version/version.go origin/v0.11/vendor/github.com/containerd/containerd/version/version.go
+index e059391..ca1b677 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/version/version.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/version/version.go
+@@ -23,7 +23,7 @@ var (
+ 	Package = "github.com/containerd/containerd"
+ 
+ 	// Version holds the complete version number. Filled in at linking time.
+-	Version = "1.6.20+unknown"
++	Version = "1.6.18+unknown"
+ 
+ 	// Revision is filled with the VCS (e.g. git) revision being used to build
+ 	// the program at linking time.
+diff --git upstream/v0.11/vendor/github.com/containerd/ttrpc/server.go origin/v0.11/vendor/github.com/containerd/ttrpc/server.go
+index e4c07b6..b0e4807 100644
+--- upstream/v0.11/vendor/github.com/containerd/ttrpc/server.go
++++ origin/v0.11/vendor/github.com/containerd/ttrpc/server.go
+@@ -24,7 +24,6 @@ import (
+ 	"net"
+ 	"sync"
+ 	"sync/atomic"
+-	"syscall"
+ 	"time"
+ 
+ 	"github.com/sirupsen/logrus"
+@@ -468,12 +467,14 @@ func (c *serverConn) run(sctx context.Context) {
+ 			// branch. Basically, it means that we are no longer receiving
+ 			// requests due to a terminal error.
+ 			recvErr = nil // connection is now "closing"
+-			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, syscall.ECONNRESET) {
++			if err == io.EOF || err == io.ErrUnexpectedEOF {
+ 				// The client went away and we should stop processing
+ 				// requests, so that the client connection is closed
+ 				return
+ 			}
+-			logrus.WithError(err).Error("error receiving message")
++			if err != nil {
++				logrus.WithError(err).Error("error receiving message")
++			}
+ 		case <-shutdown:
+ 			return
+ 		}
+diff --git upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/annotations.go origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/annotations.go
+index 6f9e6fd..581cf7c 100644
+--- upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/annotations.go
++++ origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/annotations.go
+@@ -59,13 +59,4 @@ const (
+ 
+ 	// AnnotationBaseImageName is the annotation key for the image reference of the image's base image.
+ 	AnnotationBaseImageName = "org.opencontainers.image.base.name"
+-
+-	// AnnotationArtifactCreated is the annotation key for the date and time on which the artifact was built, conforming to RFC 3339.
+-	AnnotationArtifactCreated = "org.opencontainers.artifact.created"
+-
+-	// AnnotationArtifactDescription is the annotation key for the human readable description for the artifact.
+-	AnnotationArtifactDescription = "org.opencontainers.artifact.description"
+-
+-	// AnnotationReferrersFiltersApplied is the annotation key for the comma separated list of filters applied by the registry in the referrers listing.
+-	AnnotationReferrersFiltersApplied = "org.opencontainers.referrers.filtersApplied"
+ )
+diff --git upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/artifact.go origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/artifact.go
+deleted file mode 100644
+index 03d76ce..0000000
+--- upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/artifact.go
++++ /dev/null
+@@ -1,34 +0,0 @@
+-// Copyright 2022 The Linux Foundation
+-//
+-// Licensed under the Apache License, Version 2.0 (the "License");
+-// you may not use this file except in compliance with the License.
+-// You may obtain a copy of the License at
+-//
+-//     http://www.apache.org/licenses/LICENSE-2.0
+-//
+-// Unless required by applicable law or agreed to in writing, software
+-// distributed under the License is distributed on an "AS IS" BASIS,
+-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-// See the License for the specific language governing permissions and
+-// limitations under the License.
+-
+-package v1
+-
+-// Artifact describes an artifact manifest.
+-// This structure provides `application/vnd.oci.artifact.manifest.v1+json` mediatype when marshalled to JSON.
+-type Artifact struct {
+-	// MediaType is the media type of the object this schema refers to.
+-	MediaType string `json:"mediaType"`
+-
+-	// ArtifactType is the IANA media type of the artifact this schema refers to.
+-	ArtifactType string `json:"artifactType"`
+-
+-	// Blobs is a collection of blobs referenced by this manifest.
+-	Blobs []Descriptor `json:"blobs,omitempty"`
+-
+-	// Subject (reference) is an optional link from the artifact to another manifest forming an association between the artifact and the other manifest.
+-	Subject *Descriptor `json:"subject,omitempty"`
+-
+-	// Annotations contains arbitrary metadata for the artifact manifest.
+-	Annotations map[string]string `json:"annotations,omitempty"`
+-}
+diff --git upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/config.go origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/config.go
+index e6aa113..ffff4b6 100644
+--- upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/config.go
++++ origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/config.go
+@@ -48,15 +48,6 @@ type ImageConfig struct {
+ 
+ 	// StopSignal contains the system call signal that will be sent to the container to exit.
+ 	StopSignal string `json:"StopSignal,omitempty"`
+-
+-	// ArgsEscaped `[Deprecated]` - This field is present only for legacy
+-	// compatibility with Docker and should not be used by new image builders.
+-	// It is used by Docker for Windows images to indicate that the `Entrypoint`
+-	// or `Cmd` or both, contains only a single element array, that is a
+-	// pre-escaped, and combined into a single string `CommandLine`. If `true`
+-	// the value in `Entrypoint` or `Cmd` should be used as-is to avoid double
+-	// escaping.
+-	ArgsEscaped bool `json:"ArgsEscaped,omitempty"`
+ }
+ 
+ // RootFS describes a layer content addresses
+diff --git upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/descriptor.go origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/descriptor.go
+index 9654aa5..94f19be 100644
+--- upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/descriptor.go
++++ origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/descriptor.go
+@@ -1,4 +1,4 @@
+-// Copyright 2016-2022 The Linux Foundation
++// Copyright 2016 The Linux Foundation
+ //
+ // Licensed under the Apache License, Version 2.0 (the "License");
+ // you may not use this file except in compliance with the License.
+@@ -44,9 +44,6 @@ type Descriptor struct {
+ 	//
+ 	// This should only be used when referring to a manifest.
+ 	Platform *Platform `json:"platform,omitempty"`
+-
+-	// ArtifactType is the IANA media type of this artifact.
+-	ArtifactType string `json:"artifactType,omitempty"`
+ }
+ 
+ // Platform describes the platform which the image in the manifest runs on.
+diff --git upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/manifest.go origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/manifest.go
+index 730a093..8212d52 100644
+--- upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/manifest.go
++++ origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/manifest.go
+@@ -1,4 +1,4 @@
+-// Copyright 2016-2022 The Linux Foundation
++// Copyright 2016 The Linux Foundation
+ //
+ // Licensed under the Apache License, Version 2.0 (the "License");
+ // you may not use this file except in compliance with the License.
+@@ -30,9 +30,6 @@ type Manifest struct {
+ 	// Layers is an indexed list of layers referenced by the manifest.
+ 	Layers []Descriptor `json:"layers"`
+ 
+-	// Subject is an optional link from the image manifest to another manifest forming an association between the image manifest and the other manifest.
+-	Subject *Descriptor `json:"subject,omitempty"`
+-
+ 	// Annotations contains arbitrary metadata for the image manifest.
+ 	Annotations map[string]string `json:"annotations,omitempty"`
+ }
+diff --git upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/mediatype.go origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/mediatype.go
+index 935b481..4f35ac1 100644
+--- upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/mediatype.go
++++ origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/v1/mediatype.go
+@@ -54,7 +54,4 @@ const (
+ 
+ 	// MediaTypeImageConfig specifies the media type for the image configuration.
+ 	MediaTypeImageConfig = "application/vnd.oci.image.config.v1+json"
+-
+-	// MediaTypeArtifactManifest specifies the media type for a content descriptor.
+-	MediaTypeArtifactManifest = "application/vnd.oci.artifact.manifest.v1+json"
+ )
+diff --git upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/version.go origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/version.go
+index 1afd590..31f99cf 100644
+--- upstream/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/version.go
++++ origin/v0.11/vendor/github.com/opencontainers/image-spec/specs-go/version.go
+@@ -20,9 +20,9 @@ const (
+ 	// VersionMajor is for an API incompatible changes
+ 	VersionMajor = 1
+ 	// VersionMinor is for functionality in a backwards-compatible manner
+-	VersionMinor = 1
++	VersionMinor = 0
+ 	// VersionPatch is for backwards-compatible bug fixes
+-	VersionPatch = 0
++	VersionPatch = 2
+ 
+ 	// VersionDev indicates development branch. Releases will be empty string.
+ 	VersionDev = "-dev"
+diff --git upstream/v0.11/vendor/modules.txt origin/v0.11/vendor/modules.txt
+index d47b48e..414a396 100644
+--- upstream/v0.11/vendor/modules.txt
++++ origin/v0.11/vendor/modules.txt
+@@ -58,7 +58,7 @@ github.com/Microsoft/go-winio/backuptar
+ github.com/Microsoft/go-winio/pkg/guid
+ github.com/Microsoft/go-winio/pkg/security
+ github.com/Microsoft/go-winio/vhd
+-# github.com/Microsoft/hcsshim v0.9.8
++# github.com/Microsoft/hcsshim v0.9.6
+ ## explicit; go 1.13
+ github.com/Microsoft/hcsshim
+ github.com/Microsoft/hcsshim/computestorage
+@@ -215,7 +215,7 @@ github.com/containerd/cgroups/stats/v1
+ # github.com/containerd/console v1.0.3
+ ## explicit; go 1.13
+ github.com/containerd/console
+-# github.com/containerd/containerd v1.6.20
++# github.com/containerd/containerd v1.6.18
+ ## explicit; go 1.17
+ github.com/containerd/containerd
+ github.com/containerd/containerd/api/services/containers/v1
+@@ -233,7 +233,6 @@ github.com/containerd/containerd/api/types
+ github.com/containerd/containerd/api/types/task
+ github.com/containerd/containerd/archive
+ github.com/containerd/containerd/archive/compression
+-github.com/containerd/containerd/archive/tarheader
+ github.com/containerd/containerd/cio
+ github.com/containerd/containerd/containers
+ github.com/containerd/containerd/content
+@@ -342,7 +341,7 @@ github.com/containerd/stargz-snapshotter/estargz
+ github.com/containerd/stargz-snapshotter/estargz/errorutil
+ github.com/containerd/stargz-snapshotter/estargz/externaltoc
+ github.com/containerd/stargz-snapshotter/estargz/zstdchunked
+-# github.com/containerd/ttrpc v1.1.1
++# github.com/containerd/ttrpc v1.1.0
+ ## explicit; go 1.13
+ github.com/containerd/ttrpc
+ # github.com/containerd/typeurl v1.0.2
+@@ -598,12 +597,12 @@ github.com/morikuni/aec
+ # github.com/opencontainers/go-digest v1.0.0
+ ## explicit; go 1.13
+ github.com/opencontainers/go-digest
+-# github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
+-## explicit; go 1.17
++# github.com/opencontainers/image-spec v1.0.3-0.20220303224323-02efb9a75ee1
++## explicit; go 1.16
+ github.com/opencontainers/image-spec/identity
+ github.com/opencontainers/image-spec/specs-go
+ github.com/opencontainers/image-spec/specs-go/v1
+-# github.com/opencontainers/runc v1.1.5
++# github.com/opencontainers/runc v1.1.3
+ ## explicit; go 1.16
+ github.com/opencontainers/runc/libcontainer/user
+ # github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 ```
