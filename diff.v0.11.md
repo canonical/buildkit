@@ -1539,6 +1539,21 @@ index 4f80ddf..7bbb327 100644
  	if err != nil {
  		return nil, err
  	}
+diff --git upstream/v0.11/solver/llbsolver/proc/sbom.go origin/v0.11/solver/llbsolver/proc/sbom.go
+index 0a99163..2d7e969 100644
+--- upstream/v0.11/solver/llbsolver/proc/sbom.go
++++ origin/v0.11/solver/llbsolver/proc/sbom.go
+@@ -38,10 +38,6 @@ func SBOMProcessor(scannerRef string, useCache bool) llbsolver.Processor {
+ 			if !ok {
+ 				return nil, errors.Errorf("could not find ref %s", p.ID)
+ 			}
+-			if ref == nil {
+-				continue
+-			}
+-
+ 			defop, err := llb.NewDefinitionOp(ref.Definition())
+ 			if err != nil {
+ 				return nil, err
 diff --git upstream/v0.11/solver/llbsolver/solver.go origin/v0.11/solver/llbsolver/solver.go
 index d65a9e6..2f7ba61 100644
 --- upstream/v0.11/solver/llbsolver/solver.go
@@ -1614,6 +1629,27 @@ index 41a31bb..6901332 100644
  			break
  		}
  		lastDgst = newDgst
+diff --git upstream/v0.11/util/resolver/authorizer.go origin/v0.11/util/resolver/authorizer.go
+index d97d32d..6a4140d 100644
+--- upstream/v0.11/util/resolver/authorizer.go
++++ origin/v0.11/util/resolver/authorizer.go
+@@ -356,15 +356,7 @@ func (ah *authHandler) fetchToken(ctx context.Context, sm *session.Manager, g se
+ 		if resp.ExpiresIn == 0 {
+ 			resp.ExpiresIn = defaultExpiration
+ 		}
+-		expires = int(resp.ExpiresIn)
+-		// We later check issuedAt.isZero, which would return
+-		// false if converted from zero Unix time. Therefore,
+-		// zero time value in response is handled separately
+-		if resp.IssuedAt == 0 {
+-			issuedAt = time.Time{}
+-		} else {
+-			issuedAt = time.Unix(resp.IssuedAt, 0)
+-		}
++		issuedAt, expires = time.Unix(resp.IssuedAt, 0), int(resp.ExpiresIn)
+ 		token = resp.Token
+ 		return nil, nil
+ 	}
 diff --git upstream/v0.11/util/rootless/mountopts/mountopts_linux.go origin/v0.11/util/rootless/mountopts/mountopts_linux.go
 deleted file mode 100644
 index 92c542b..0000000
