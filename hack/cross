@@ -17,5 +17,7 @@ if [ -n "$RUNC_PLATFORMS" ]; then
     $currentcontext
 fi
 
-buildxCmd build $platformFlag $cacheFromFlags \
+buildxCmd build --secret id=ARTIFACTORY_APT_AUTH_CONF \
+  --secret id=ARTIFACTORY_BASE64_GPG \
+  $platformFlag $cacheFromFlags \
   $currentcontext
