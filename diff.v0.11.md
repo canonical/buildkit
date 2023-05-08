@@ -1,9 +1,9 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..e11d93e 100644
+index 40d60dc..d057404 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
-@@ -22,8 +22,13 @@ on:
+@@ -22,10 +22,16 @@ on:
        - 'frontend/dockerfile/docs/**'
  
  env:
@@ -16,9 +16,13 @@ index 40d60dc..e11d93e 100644
 +  REPO_SLUG_TARGET: "ghcr.io/canonical/buildkit"
 +  # we aren't gonna touch this
    DF_REPO_SLUG_TARGET: "docker/dockerfile-upstream"
-   PLATFORMS: "linux/amd64,linux/arm/v7,linux/arm64,linux/s390x,linux/ppc64le,linux/riscv64"
+-  PLATFORMS: "linux/amd64,linux/arm/v7,linux/arm64,linux/s390x,linux/ppc64le,linux/riscv64"
++  # PLATFORMS: "linux/amd64,linux/arm/v7,linux/arm64,linux/s390x,linux/ppc64le,linux/riscv64"
++  PLATFORMS: "linux/amd64"
    CACHE_GHA_SCOPE_IT: "integration-tests"
-@@ -321,7 +326,9 @@ jobs:
+   CACHE_GHA_SCOPE_BINARIES: "binaries"
+   CACHE_GHA_SCOPE_CROSS: "cross"
+@@ -321,10 +327,14 @@ jobs:
          run: |
            ./hack/cross
          env:
@@ -29,7 +33,12 @@ index 40d60dc..e11d93e 100644
            RUNC_PLATFORMS: ${{ env.PLATFORMS }}
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
            CACHE_TO: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
-@@ -379,12 +386,13 @@ jobs:
++          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
++          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
+ 
+   release-base:
+     runs-on: ubuntu-20.04
+@@ -379,12 +389,13 @@ jobs:
            driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
            buildkitd-flags: --debug
        -
@@ -46,7 +55,7 @@ index 40d60dc..e11d93e 100644
        -
          name: Build ${{ needs.release-base.outputs.tag }}
          run: |
-@@ -394,6 +402,10 @@ jobs:
+@@ -394,6 +405,10 @@ jobs:
            TARGET: ${{ matrix.target-stage }}
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}
            CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
@@ -57,7 +66,7 @@ index 40d60dc..e11d93e 100644
  
    binaries:
      runs-on: ubuntu-20.04
-@@ -421,7 +433,9 @@ jobs:
+@@ -421,7 +436,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -68,7 +77,7 @@ index 40d60dc..e11d93e 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -441,82 +455,83 @@ jobs:
+@@ -441,82 +458,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
