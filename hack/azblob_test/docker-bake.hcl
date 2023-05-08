@@ -8,5 +8,4 @@ target "default" {
     buildkit = "target:buildkit"
   }
   tags = ["moby/buildkit:azblobtest"]
-  secret = ["id=ARTIFACTORY_APT_AUTH_CONF,id=ARTIFACTORY_BASE64_GPG"]
 }
