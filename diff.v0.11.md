@@ -1509,6 +1509,16 @@ index d1315e6..090edc5 100755
 -buildxCmd build $platformFlag $targetFlag $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
 +buildxCmd build $platformFlag $targetFlag $secrets $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
    $currentcontext
+diff --git upstream/v0.11/hack/s3_test/docker-bake.hcl origin/v0.11/hack/s3_test/docker-bake.hcl
+index 351e84b..41002d1 100644
+--- upstream/v0.11/hack/s3_test/docker-bake.hcl
++++ origin/v0.11/hack/s3_test/docker-bake.hcl
+@@ -8,4 +8,5 @@ target "default" {
+     buildkit = "target:buildkit"
+   }
+   tags = ["moby/buildkit:s3test"]
++  secret = ["id=ARTIFACTORY_APT_AUTH_CONF,id=ARTIFACTORY_BASE64_GPG"]
+ }
 diff --git upstream/v0.11/hack/test origin/v0.11/hack/test
 index 7b2ffa3..929733d 100755
 --- upstream/v0.11/hack/test
