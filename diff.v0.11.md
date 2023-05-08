@@ -1,9 +1,9 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..01e4837 100644
+index 40d60dc..d057404 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
-@@ -22,15 +22,21 @@ on:
+@@ -22,10 +22,16 @@ on:
        - 'frontend/dockerfile/docs/**'
  
  env:
@@ -22,12 +22,6 @@ index 40d60dc..01e4837 100644
    CACHE_GHA_SCOPE_IT: "integration-tests"
    CACHE_GHA_SCOPE_BINARIES: "binaries"
    CACHE_GHA_SCOPE_CROSS: "cross"
-   TESTFLAGS: "-v --parallel=6 --timeout=30m"
--  BUILDX_VERSION: "v0.10.0-rc3"  # leave empty to use the one available on GitHub virtual environment
-+  BUILDX_VERSION: "" # "v0.10.0-rc3"  # leave empty to use the one available on GitHub virtual environment
-   GO_VERSION: "1.19"
- 
- jobs:
 @@ -321,10 +327,14 @@ jobs:
          run: |
            ./hack/cross
@@ -1478,6 +1472,21 @@ index ac08571..9cb25f9 100644
  github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8/go.mod h1:HUYIGzjTL3rfEspMxjDjgmT5uz5wzYJKVo23qUhYTos=
  github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
  github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
+diff --git upstream/v0.11/hack/azblob_test/docker-bake.hcl origin/v0.11/hack/azblob_test/docker-bake.hcl
+index fc57c4a..a0997f8 100644
+--- upstream/v0.11/hack/azblob_test/docker-bake.hcl
++++ origin/v0.11/hack/azblob_test/docker-bake.hcl
+@@ -1,6 +1,10 @@
+ target "buildkit" {
+   context = "../../"
+   cache-from = ["type=gha,scope=binaries"]
++  secret = [
++    "id=ARTIFACTORY_APT_AUTH_CONF",
++    "id=ARTIFACTORY_BASE64_GPG"
++  ]
+ }
+ 
+ target "default" {
 diff --git upstream/v0.11/hack/azblob_test/run_test.sh origin/v0.11/hack/azblob_test/run_test.sh
 index cdf0dc2..cfcae8b 100755
 --- upstream/v0.11/hack/azblob_test/run_test.sh
@@ -1530,18 +1539,29 @@ index d1315e6..090edc5 100755
 -buildxCmd build $platformFlag $targetFlag $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
 +buildxCmd build $platformFlag $targetFlag $secrets $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
    $currentcontext
+diff --git upstream/v0.11/hack/s3_test/docker-bake.hcl origin/v0.11/hack/s3_test/docker-bake.hcl
+index 351e84b..e9f7cdd 100644
+--- upstream/v0.11/hack/s3_test/docker-bake.hcl
++++ origin/v0.11/hack/s3_test/docker-bake.hcl
+@@ -1,6 +1,10 @@
+ target "buildkit" {
+   context = "../../"
+   cache-from = ["type=gha,scope=binaries"]
++  secret = [
++    "id=ARTIFACTORY_APT_AUTH_CONF",
++    "id=ARTIFACTORY_BASE64_GPG"
++  ]
+ }
+ 
+ target "default" {
 diff --git upstream/v0.11/hack/s3_test/run_test.sh origin/v0.11/hack/s3_test/run_test.sh
-index a2b2d4d..9ea4470 100755
+index a2b2d4d..afa3ce1 100755
 --- upstream/v0.11/hack/s3_test/run_test.sh
 +++ origin/v0.11/hack/s3_test/run_test.sh
-@@ -2,6 +2,9 @@
- 
+@@ -3,5 +3,6 @@
  cd "$(dirname "$0")"
  
--docker buildx bake --load
-+docker buildx bake --load \
-+  --set buildkit.secrets=id=ARTIFACTORY_APT_AUTH_CONF \
-+  --set buildkit.secrets=id=ARTIFACTORY_BASE64_GPG
+ docker buildx bake --load
 +
  docker run --rm --privileged -p 9001:9001 -p 8060:8060 moby/buildkit:s3test /test/test.sh
  docker rmi moby/buildkit:s3test
