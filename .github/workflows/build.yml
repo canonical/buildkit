@@ -30,7 +30,8 @@ env:
   REPO_SLUG_TARGET: "ghcr.io/canonical/buildkit"
   # we aren't gonna touch this
   DF_REPO_SLUG_TARGET: "docker/dockerfile-upstream"
-  PLATFORMS: "linux/amd64,linux/arm/v7,linux/arm64,linux/s390x,linux/ppc64le,linux/riscv64"
+  # PLATFORMS: "linux/amd64,linux/arm/v7,linux/arm64,linux/s390x,linux/ppc64le,linux/riscv64"
+  PLATFORMS: "linux/amd64"
   CACHE_GHA_SCOPE_IT: "integration-tests"
   CACHE_GHA_SCOPE_BINARIES: "binaries"
   CACHE_GHA_SCOPE_CROSS: "cross"
@@ -332,6 +333,8 @@ jobs:
           RUNC_PLATFORMS: ${{ env.PLATFORMS }}
           CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
           CACHE_TO: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
+          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
+          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
 
   release-base:
     runs-on: ubuntu-20.04
