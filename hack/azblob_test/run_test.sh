@@ -8,7 +8,8 @@ trap cleanup EXIT
 cd "$(dirname "$0")"
 
 docker buildx bake --load \
-  --set *.secrets=id="ARTIFACTORY_APT_AUTH_CONF,id=ARTIFACTORY_BASE64_GPG"
+  --set buildkit.secrets=id=ARTIFACTORY_APT_AUTH_CONF \
+  --set buildkit.secrets=id=ARTIFACTORY_BASE64_GPG
 
 AZURE_ACCOUNT_NAME=azblobcacheaccount
 AZURE_ACCOUNT_URL=azblobcacheaccount.blob.localhost.com
