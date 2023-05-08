@@ -1472,16 +1472,21 @@ index ac08571..9cb25f9 100644
  github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8/go.mod h1:HUYIGzjTL3rfEspMxjDjgmT5uz5wzYJKVo23qUhYTos=
  github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
  github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
-diff --git upstream/v0.11/hack/azblob_test/docker-bake.hcl origin/v0.11/hack/azblob_test/docker-bake.hcl
-index fc57c4a..2b9f990 100644
---- upstream/v0.11/hack/azblob_test/docker-bake.hcl
-+++ origin/v0.11/hack/azblob_test/docker-bake.hcl
-@@ -8,4 +8,5 @@ target "default" {
-     buildkit = "target:buildkit"
-   }
-   tags = ["moby/buildkit:azblobtest"]
-+  secret = ["id=ARTIFACTORY_APT_AUTH_CONF,id=ARTIFACTORY_BASE64_GPG"]
- }
+diff --git upstream/v0.11/hack/azblob_test/run_test.sh origin/v0.11/hack/azblob_test/run_test.sh
+index cdf0dc2..542bcbd 100755
+--- upstream/v0.11/hack/azblob_test/run_test.sh
++++ origin/v0.11/hack/azblob_test/run_test.sh
+@@ -7,7 +7,9 @@ function cleanup() {
+ trap cleanup EXIT
+ cd "$(dirname "$0")"
+ 
+-docker buildx bake --load
++docker buildx bake --load \
++  --set *.secret=id=ARTIFACTORY_APT_AUTH_CONF \
++  --set *.secret=id=ARTIFACTORY_BASE64_GPG
+ 
+ AZURE_ACCOUNT_NAME=azblobcacheaccount
+ AZURE_ACCOUNT_URL=azblobcacheaccount.blob.localhost.com
 diff --git upstream/v0.11/hack/cross origin/v0.11/hack/cross
 index 1502fd2..4e3f7d8 100755
 --- upstream/v0.11/hack/cross
@@ -1519,16 +1524,20 @@ index d1315e6..090edc5 100755
 -buildxCmd build $platformFlag $targetFlag $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
 +buildxCmd build $platformFlag $targetFlag $secrets $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
    $currentcontext
-diff --git upstream/v0.11/hack/s3_test/docker-bake.hcl origin/v0.11/hack/s3_test/docker-bake.hcl
-index 351e84b..41002d1 100644
---- upstream/v0.11/hack/s3_test/docker-bake.hcl
-+++ origin/v0.11/hack/s3_test/docker-bake.hcl
-@@ -8,4 +8,5 @@ target "default" {
-     buildkit = "target:buildkit"
-   }
-   tags = ["moby/buildkit:s3test"]
-+  secret = ["id=ARTIFACTORY_APT_AUTH_CONF,id=ARTIFACTORY_BASE64_GPG"]
- }
+diff --git upstream/v0.11/hack/s3_test/run_test.sh origin/v0.11/hack/s3_test/run_test.sh
+index a2b2d4d..b792dea 100755
+--- upstream/v0.11/hack/s3_test/run_test.sh
++++ origin/v0.11/hack/s3_test/run_test.sh
+@@ -2,6 +2,8 @@
+ 
+ cd "$(dirname "$0")"
+ 
+-docker buildx bake --load
++docker buildx bake --load \
++  --set *.secret=id=ARTIFACTORY_APT_AUTH_CONF \
++  --set *.secret=id=ARTIFACTORY_BASE64_GPG
+ docker run --rm --privileged -p 9001:9001 -p 8060:8060 moby/buildkit:s3test /test/test.sh
+ docker rmi moby/buildkit:s3test
 diff --git upstream/v0.11/hack/test origin/v0.11/hack/test
 index 7b2ffa3..929733d 100755
 --- upstream/v0.11/hack/test
