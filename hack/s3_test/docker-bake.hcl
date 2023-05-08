@@ -8,4 +8,5 @@ target "default" {
     buildkit = "target:buildkit"
   }
   tags = ["moby/buildkit:s3test"]
+  secret = ["id=ARTIFACTORY_APT_AUTH_CONF,id=ARTIFACTORY_BASE64_GPG"]
 }
