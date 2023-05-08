@@ -403,7 +403,9 @@ jobs:
           CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}
           CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
           ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
-          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }} 
+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
+          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
 
   binaries:
     runs-on: ubuntu-20.04

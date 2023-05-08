@@ -55,9 +55,8 @@ targetFlag=""
 secrets=""
 if [ -n "$TARGET" ]; then
   targetFlag="--target=$TARGET"
-  if [[ "$TARGET" == "rootless" ]]
-  then
-    secrets="--secret id=ARTIFACTORY_ACCESS_TOKEN --secret id=ARTIFACTORY_URL"
+  if [[ "$TARGET" == "rootless" ]]; then
+    secrets="--secret id=ARTIFACTORY_ACCESS_TOKEN --secret id=ARTIFACTORY_APT_AUTH_CONF --secret id=ARTIFACTORY_BASE64_GPG --secret id=ARTIFACTORY_URL"
   fi
 fi
 

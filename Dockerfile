@@ -114,11 +114,11 @@ FROM binaries-linux-helper AS binaries-linux
 COPY --link --from=buildctl /usr/bin/buildctl /
 COPY --link --from=buildkitd /usr/bin/buildkitd /
 
-FROM scratch AS binaries-darwin
-COPY --link --from=buildctl /usr/bin/buildctl /
+# FROM scratch AS binaries-darwin
+# COPY --link --from=buildctl /usr/bin/buildctl /
 
-FROM scratch AS binaries-windows
-COPY --link --from=buildctl /usr/bin/buildctl /buildctl.exe
+# FROM scratch AS binaries-windows
+# COPY --link --from=buildctl /usr/bin/buildctl /buildctl.exe
 
 FROM binaries-$TARGETOS AS binaries
 # enable scanning for this stage
@@ -137,14 +137,26 @@ COPY --link --from=releaser /out/ /
 
 FROM ubuntubase AS buildkit-export
 ARG RUNC_VERSION
-RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils runc=${RUNC_VERSION}\
+SHELL ["/bin/bash", "-oeux", "pipefail", "-c"]
+# TODO: get fuse* from Artifactory once available
+RUN --mount=type=secret,required=true,id=ARTIFACTORY_APT_AUTH_CONF,mode=600,target=/etc/apt/auth.conf.d/artifactory.conf \
+  --mount=type=secret,required=true,id=ARTIFACTORY_BASE64_GPG \
+  apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 \
+  && mv /etc/apt/sources.list /etc/apt/sources.list.backup \
+  && ls /etc/apt/auth.conf.d \
+  && cat /run/secrets/ARTIFACTORY_BASE64_GPG | base64 -d > /etc/apt/trusted.gpg.d/artifactory.gpg \
+  && echo "deb [signed-by=/etc/apt/trusted.gpg.d/artifactory.gpg] https://canonical.jfrog.io/artifactory/soss-deb-stable/ focal main" > /etc/apt/sources.list \
+  && apt update -o Acquire::https::Verify-Peer=false \
+  && DEBIAN_FRONTEND=noninteractive apt install -y ca-certificates -o Acquire::https::Verify-Peer=false \
+  && apt update \
+  && DEBIAN_FRONTEND=noninteractive apt install -y git openssh-server pigz xz-utils runc=${RUNC_VERSION} \
+  && mv /etc/apt/sources.list.backup /etc/apt/sources.list \
+  && rm /etc/apt/trusted.gpg.d/artifactory.gpg \
   && rm -rf /var/lib/apt/lists/*
 COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
 VOLUME /var/lib/buildkit
 
 FROM git AS containerd-src
-ARG CONTAINERD_VERSION
-ARG CONTAINERD_ALT_VERSION
 WORKDIR /usr/src
 RUN git clone https://github.com/containerd/containerd.git containerd
 
@@ -221,11 +233,11 @@ FROM buildkit-export AS buildkit-linux
 COPY --link --from=binaries / /usr/bin/
 ENTRYPOINT ["buildkitd"]
 
-FROM binaries AS buildkit-darwin
+# FROM binaries AS buildkit-darwin
 
-FROM binaries AS buildkit-windows
-# this is not in binaries-windows because it is not intended for release yet, just CI
-COPY --link --from=buildkitd /usr/bin/buildkitd /buildkitd.exe
+# FROM binaries AS buildkit-windows
+# # this is not in binaries-windows because it is not intended for release yet, just CI
+# COPY --link --from=buildkitd /usr/bin/buildkitd /buildkitd.exe
 
 FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS cni-plugins
 RUN apt update && apt install -y curl tar
@@ -280,9 +292,23 @@ VOLUME /var/lib/buildkit
 
 # Rootless mode.
 FROM ubuntubase AS rootless
-RUN apt update && \
-  DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils && \
-  rm -rf /var/lib/apt/lists/*
+SHELL ["/bin/bash", "-oeux", "pipefail", "-c"]
+# TODO: get fuse* from Artifactory once available
+RUN --mount=type=secret,required=true,id=ARTIFACTORY_APT_AUTH_CONF,mode=600,target=/etc/apt/auth.conf.d/artifactory.conf \
+  --mount=type=secret,required=true,id=ARTIFACTORY_BASE64_GPG \
+  apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs \
+  && mv /etc/apt/sources.list /etc/apt/sources.list.backup \
+  && ls /etc/apt/auth.conf.d \
+  && cat /run/secrets/ARTIFACTORY_BASE64_GPG | base64 -d > /etc/apt/trusted.gpg.d/artifactory.gpg \
+  && echo "deb [signed-by=/etc/apt/trusted.gpg.d/artifactory.gpg] https://canonical.jfrog.io/artifactory/soss-deb-stable/ focal main" > /etc/apt/sources.list \
+  && apt update -o Acquire::https::Verify-Peer=false \
+  && DEBIAN_FRONTEND=noninteractive apt install -y ca-certificates -o Acquire::https::Verify-Peer=false \
+  && apt update \
+  && DEBIAN_FRONTEND=noninteractive apt install -y git openssh-server pigz uidmap xz-utils \
+  && mv /etc/apt/sources.list.backup /etc/apt/sources.list \
+  && rm /etc/apt/trusted.gpg.d/artifactory.gpg \
+  && rm -rf /var/lib/apt/lists/*
+  
 RUN adduser --disabled-password --gecos "" -uid 1000 user \
   && mkdir -p /run/user/1000 /home/user/.local/tmp /home/user/.local/share/buildkit \
   && chown -R user /run/user/1000 /home/user \
