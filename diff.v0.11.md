@@ -1473,16 +1473,17 @@ index ac08571..9cb25f9 100644
  github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
  github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 diff --git upstream/v0.11/hack/azblob_test/run_test.sh origin/v0.11/hack/azblob_test/run_test.sh
-index cdf0dc2..d02244d 100755
+index cdf0dc2..cfcae8b 100755
 --- upstream/v0.11/hack/azblob_test/run_test.sh
 +++ origin/v0.11/hack/azblob_test/run_test.sh
-@@ -7,7 +7,8 @@ function cleanup() {
+@@ -7,7 +7,9 @@ function cleanup() {
  trap cleanup EXIT
  cd "$(dirname "$0")"
  
 -docker buildx bake --load
 +docker buildx bake --load \
-+  --set *.secrets=id="ARTIFACTORY_APT_AUTH_CONF,id=ARTIFACTORY_BASE64_GPG"
++  --set buildkit.secrets=id=ARTIFACTORY_APT_AUTH_CONF \
++  --set buildkit.secrets=id=ARTIFACTORY_BASE64_GPG
  
  AZURE_ACCOUNT_NAME=azblobcacheaccount
  AZURE_ACCOUNT_URL=azblobcacheaccount.blob.localhost.com
@@ -1524,16 +1525,17 @@ index d1315e6..090edc5 100755
 +buildxCmd build $platformFlag $targetFlag $secrets $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
    $currentcontext
 diff --git upstream/v0.11/hack/s3_test/run_test.sh origin/v0.11/hack/s3_test/run_test.sh
-index a2b2d4d..2c96162 100755
+index a2b2d4d..9ea4470 100755
 --- upstream/v0.11/hack/s3_test/run_test.sh
 +++ origin/v0.11/hack/s3_test/run_test.sh
-@@ -2,6 +2,8 @@
+@@ -2,6 +2,9 @@
  
  cd "$(dirname "$0")"
  
 -docker buildx bake --load
 +docker buildx bake --load \
-+    --set *.secrets=id="ARTIFACTORY_APT_AUTH_CONF,id=ARTIFACTORY_BASE64_GPG"
++  --set buildkit.secrets=id=ARTIFACTORY_APT_AUTH_CONF \
++  --set buildkit.secrets=id=ARTIFACTORY_BASE64_GPG
 +
  docker run --rm --privileged -p 9001:9001 -p 8060:8060 moby/buildkit:s3test /test/test.sh
  docker rmi moby/buildkit:s3test
