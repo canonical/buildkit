@@ -210,6 +210,9 @@ jobs:
         name: Test
         run: |
           hack/s3_test/run_test.sh
+        env:
+          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
+          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
 
   test-azblob:
     runs-on: ubuntu-20.04
@@ -233,6 +236,9 @@ jobs:
         name: Test
         run: |
           hack/azblob_test/run_test.sh
+        env:
+          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
+          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
 
   test-os:
     runs-on: ${{ matrix.os }}
