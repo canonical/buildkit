@@ -1,9 +1,9 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..d057404 100644
+index 40d60dc..01e4837 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
-@@ -22,10 +22,16 @@ on:
+@@ -22,15 +22,21 @@ on:
        - 'frontend/dockerfile/docs/**'
  
  env:
@@ -22,6 +22,12 @@ index 40d60dc..d057404 100644
    CACHE_GHA_SCOPE_IT: "integration-tests"
    CACHE_GHA_SCOPE_BINARIES: "binaries"
    CACHE_GHA_SCOPE_CROSS: "cross"
+   TESTFLAGS: "-v --parallel=6 --timeout=30m"
+-  BUILDX_VERSION: "v0.10.0-rc3"  # leave empty to use the one available on GitHub virtual environment
++  BUILDX_VERSION: "" # "v0.10.0-rc3"  # leave empty to use the one available on GitHub virtual environment
+   GO_VERSION: "1.19"
+ 
+ jobs:
 @@ -321,10 +327,14 @@ jobs:
          run: |
            ./hack/cross
