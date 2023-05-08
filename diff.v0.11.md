@@ -1472,6 +1472,16 @@ index ac08571..9cb25f9 100644
  github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8/go.mod h1:HUYIGzjTL3rfEspMxjDjgmT5uz5wzYJKVo23qUhYTos=
  github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
  github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
+diff --git upstream/v0.11/hack/azblob_test/docker-bake.hcl origin/v0.11/hack/azblob_test/docker-bake.hcl
+index fc57c4a..2b9f990 100644
+--- upstream/v0.11/hack/azblob_test/docker-bake.hcl
++++ origin/v0.11/hack/azblob_test/docker-bake.hcl
+@@ -8,4 +8,5 @@ target "default" {
+     buildkit = "target:buildkit"
+   }
+   tags = ["moby/buildkit:azblobtest"]
++  secret = ["id=ARTIFACTORY_APT_AUTH_CONF,id=ARTIFACTORY_BASE64_GPG"]
+ }
 diff --git upstream/v0.11/hack/cross origin/v0.11/hack/cross
 index 1502fd2..4e3f7d8 100755
 --- upstream/v0.11/hack/cross
