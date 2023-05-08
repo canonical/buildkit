@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..6e8ed02 100644
+index 40d60dc..e11d93e 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -22,8 +22,13 @@ on:
@@ -46,16 +46,18 @@ index 40d60dc..6e8ed02 100644
        -
          name: Build ${{ needs.release-base.outputs.tag }}
          run: |
-@@ -394,6 +402,8 @@ jobs:
+@@ -394,6 +402,10 @@ jobs:
            TARGET: ${{ matrix.target-stage }}
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}
            CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
 +          ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
-+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }} 
++          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
++          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
++          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
  
    binaries:
      runs-on: ubuntu-20.04
-@@ -421,7 +431,9 @@ jobs:
+@@ -421,7 +433,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -66,7 +68,7 @@ index 40d60dc..6e8ed02 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -441,82 +453,83 @@ jobs:
+@@ -441,82 +455,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
@@ -361,7 +363,7 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index 2100661..5debdde 100644
+index 2100661..6b6aec2 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
 @@ -1,62 +1,67 @@
@@ -481,7 +483,21 @@ index 2100661..5debdde 100644
  # built from https://github.com/tonistiigi/binfmt/releases/tag/buildkit%2Fv7.1.0-30
  COPY --link --from=tonistiigi/binfmt:buildkit-v7.1.0-30@sha256:45dd57b4ba2f24e2354f71f1e4e51f073cb7a28fd848ce6f5f2a7701142a6bf0 / /
  
-@@ -119,8 +124,8 @@ FROM binaries-$TARGETOS AS binaries
+@@ -109,18 +114,18 @@ FROM binaries-linux-helper AS binaries-linux
+ COPY --link --from=buildctl /usr/bin/buildctl /
+ COPY --link --from=buildkitd /usr/bin/buildkitd /
+ 
+-FROM scratch AS binaries-darwin
+-COPY --link --from=buildctl /usr/bin/buildctl /
++# FROM scratch AS binaries-darwin
++# COPY --link --from=buildctl /usr/bin/buildctl /
+ 
+-FROM scratch AS binaries-windows
+-COPY --link --from=buildctl /usr/bin/buildctl /buildctl.exe
++# FROM scratch AS binaries-windows
++# COPY --link --from=buildctl /usr/bin/buildctl /buildctl.exe
+ 
+ FROM binaries-$TARGETOS AS binaries
  # enable scanning for this stage
  ARG BUILDKIT_SBOM_SCAN_STAGE=true
  
@@ -492,7 +508,7 @@ index 2100661..5debdde 100644
  WORKDIR /work
  ARG TARGETPLATFORM
  RUN --mount=from=binaries \
-@@ -130,9 +135,10 @@ RUN --mount=from=binaries \
+@@ -130,15 +135,28 @@ RUN --mount=from=binaries \
  FROM scratch AS release
  COPY --link --from=releaser /out/ /
  
@@ -501,12 +517,32 @@ index 2100661..5debdde 100644
 -  && ln -s fusermount3 /usr/bin/fusermount
 +FROM ubuntubase AS buildkit-export
 +ARG RUNC_VERSION
-+RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils runc=${RUNC_VERSION}\
++SHELL ["/bin/bash", "-oeux", "pipefail", "-c"]
++# TODO: get fuse* from Artifactory once available
++RUN --mount=type=secret,required=true,id=ARTIFACTORY_APT_AUTH_CONF,mode=600,target=/etc/apt/auth.conf.d/artifactory.conf \
++  --mount=type=secret,required=true,id=ARTIFACTORY_BASE64_GPG \
++  apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 \
++  && mv /etc/apt/sources.list /etc/apt/sources.list.backup \
++  && ls /etc/apt/auth.conf.d \
++  && cat /run/secrets/ARTIFACTORY_BASE64_GPG | base64 -d > /etc/apt/trusted.gpg.d/artifactory.gpg \
++  && echo "deb [signed-by=/etc/apt/trusted.gpg.d/artifactory.gpg] https://canonical.jfrog.io/artifactory/soss-deb-stable/ focal main" > /etc/apt/sources.list \
++  && apt update -o Acquire::https::Verify-Peer=false \
++  && DEBIAN_FRONTEND=noninteractive apt install -y ca-certificates -o Acquire::https::Verify-Peer=false \
++  && apt update \
++  && DEBIAN_FRONTEND=noninteractive apt install -y git openssh-server pigz xz-utils runc=${RUNC_VERSION} \
++  && mv /etc/apt/sources.list.backup /etc/apt/sources.list \
++  && rm /etc/apt/trusted.gpg.d/artifactory.gpg \
 +  && rm -rf /var/lib/apt/lists/*
  COPY --link examples/buildctl-daemonless/buildctl-daemonless.sh /usr/bin/
  VOLUME /var/lib/buildkit
  
-@@ -146,7 +152,7 @@ FROM gobuild-base AS containerd-base
+ FROM git AS containerd-src
+-ARG CONTAINERD_VERSION
+-ARG CONTAINERD_ALT_VERSION
+ WORKDIR /usr/src
+ RUN git clone https://github.com/containerd/containerd.git containerd
+ 
+@@ -146,7 +164,7 @@ FROM gobuild-base AS containerd-base
  WORKDIR /go/src/github.com/containerd/containerd
  ARG TARGETPLATFORM
  ENV CGO_ENABLED=1 BUILDTAGS=no_btrfs GO111MODULE=off
@@ -515,7 +551,7 @@ index 2100661..5debdde 100644
  
  FROM containerd-base AS containerd
  ARG CONTAINERD_VERSION
-@@ -173,11 +179,21 @@ FROM registry:$REGISTRY_VERSION AS registry
+@@ -173,11 +191,21 @@ FROM registry:$REGISTRY_VERSION AS registry
  
  FROM gobuild-base AS rootlesskit
  ARG ROOTLESSKIT_VERSION
@@ -539,9 +575,19 @@ index 2100661..5debdde 100644
    CGO_ENABLED=0 xx-go build -o /rootlesskit ./cmd/rootlesskit && \
    xx-verify --static /rootlesskit
  
-@@ -211,8 +227,8 @@ FROM binaries AS buildkit-windows
- # this is not in binaries-windows because it is not intended for release yet, just CI
- COPY --link --from=buildkitd /usr/bin/buildkitd /buildkitd.exe
+@@ -205,14 +233,14 @@ FROM buildkit-export AS buildkit-linux
+ COPY --link --from=binaries / /usr/bin/
+ ENTRYPOINT ["buildkitd"]
+ 
+-FROM binaries AS buildkit-darwin
++# FROM binaries AS buildkit-darwin
+ 
+-FROM binaries AS buildkit-windows
+-# this is not in binaries-windows because it is not intended for release yet, just CI
+-COPY --link --from=buildkitd /usr/bin/buildkitd /buildkitd.exe
++# FROM binaries AS buildkit-windows
++# # this is not in binaries-windows because it is not intended for release yet, just CI
++# COPY --link --from=buildkitd /usr/bin/buildkitd /buildkitd.exe
  
 -FROM --platform=$BUILDPLATFORM alpine:${ALPINE_VERSION} AS cni-plugins
 -RUN apk add --no-cache curl
@@ -550,7 +596,7 @@ index 2100661..5debdde 100644
  ARG CNI_VERSION
  ARG TARGETOS
  ARG TARGETARCH
-@@ -223,7 +239,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
+@@ -223,7 +251,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
  FROM buildkit-base AS integration-tests-base
  ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
  ARG NERDCTL_VERSION
@@ -561,7 +607,7 @@ index 2100661..5debdde 100644
    && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
    && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
    && mkdir -m 0700 -p /run/user/1000 \
-@@ -242,10 +260,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
+@@ -242,10 +272,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
  ENV CGO_ENABLED=0
  COPY --link --from=nydus /out/nydus-static/* /usr/bin/
  COPY --link --from=stargz-snapshotter /out/* /usr/bin/
@@ -574,7 +620,7 @@ index 2100661..5debdde 100644
  COPY --link --from=containerd /out/containerd* /usr/bin/
  COPY --link --from=cni-plugins /opt/cni/bin/bridge /opt/cni/bin/host-local /opt/cni/bin/loopback /opt/cni/bin/firewall /opt/cni/bin/dnsname /opt/cni/bin/
  COPY --link hack/fixtures/cni.json /etc/buildkit/cni.json
-@@ -261,13 +279,17 @@ FROM integration-tests AS dev-env
+@@ -261,13 +291,31 @@ FROM integration-tests AS dev-env
  VOLUME /var/lib/buildkit
  
  # Rootless mode.
@@ -582,9 +628,23 @@ index 2100661..5debdde 100644
 -RUN apk add --no-cache fuse3 fuse-overlayfs git openssh pigz shadow-uidmap xz
 -RUN adduser -D -u 1000 user \
 +FROM ubuntubase AS rootless
-+RUN apt update && \
-+  DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils && \
-+  rm -rf /var/lib/apt/lists/*
++SHELL ["/bin/bash", "-oeux", "pipefail", "-c"]
++# TODO: get fuse* from Artifactory once available
++RUN --mount=type=secret,required=true,id=ARTIFACTORY_APT_AUTH_CONF,mode=600,target=/etc/apt/auth.conf.d/artifactory.conf \
++  --mount=type=secret,required=true,id=ARTIFACTORY_BASE64_GPG \
++  apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs \
++  && mv /etc/apt/sources.list /etc/apt/sources.list.backup \
++  && ls /etc/apt/auth.conf.d \
++  && cat /run/secrets/ARTIFACTORY_BASE64_GPG | base64 -d > /etc/apt/trusted.gpg.d/artifactory.gpg \
++  && echo "deb [signed-by=/etc/apt/trusted.gpg.d/artifactory.gpg] https://canonical.jfrog.io/artifactory/soss-deb-stable/ focal main" > /etc/apt/sources.list \
++  && apt update -o Acquire::https::Verify-Peer=false \
++  && DEBIAN_FRONTEND=noninteractive apt install -y ca-certificates -o Acquire::https::Verify-Peer=false \
++  && apt update \
++  && DEBIAN_FRONTEND=noninteractive apt install -y git openssh-server pigz uidmap xz-utils \
++  && mv /etc/apt/sources.list.backup /etc/apt/sources.list \
++  && rm /etc/apt/trusted.gpg.d/artifactory.gpg \
++  && rm -rf /var/lib/apt/lists/*
++  
 +RUN adduser --disabled-password --gecos "" -uid 1000 user \
    && mkdir -p /run/user/1000 /home/user/.local/tmp /home/user/.local/share/buildkit \
    && chown -R user /run/user/1000 /home/user \
@@ -1404,24 +1464,23 @@ index ac08571..9cb25f9 100644
  github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
  github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 diff --git upstream/v0.11/hack/images origin/v0.11/hack/images
-index d1315e6..674a77b 100755
+index d1315e6..090edc5 100755
 --- upstream/v0.11/hack/images
 +++ origin/v0.11/hack/images
-@@ -52,8 +52,13 @@ if [ -n "$localmode" ]; then
+@@ -52,8 +52,12 @@ if [ -n "$localmode" ]; then
  fi
  
  targetFlag=""
 +secrets=""
  if [ -n "$TARGET" ]; then
    targetFlag="--target=$TARGET"
-+  if [[ "$TARGET" == "rootless" ]]
-+  then
-+    secrets="--secret id=ARTIFACTORY_ACCESS_TOKEN --secret id=ARTIFACTORY_URL"
++  if [[ "$TARGET" == "rootless" ]]; then
++    secrets="--secret id=ARTIFACTORY_ACCESS_TOKEN --secret id=ARTIFACTORY_APT_AUTH_CONF --secret id=ARTIFACTORY_BASE64_GPG --secret id=ARTIFACTORY_URL"
 +  fi
  fi
  
  tagNames="$REPO:$TAG"
-@@ -97,5 +102,5 @@ if [[ "$RELEASE" = "true" ]] && [[ "$GITHUB_ACTIONS" = "true" ]]; then
+@@ -97,5 +101,5 @@ if [[ "$RELEASE" = "true" ]] && [[ "$GITHUB_ACTIONS" = "true" ]]; then
    nocacheFilterFlag="--no-cache-filter=git,buildkit-export,gobuild-base"
  fi
  
