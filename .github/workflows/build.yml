@@ -246,9 +246,9 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-20.04
+          # - ubuntu-20.04
           # - macOS-11
-          # - windows-2022
+          - windows-2022
     steps:
       -
         name: Checkout
@@ -270,7 +270,7 @@ jobs:
           SKIP_INTEGRATION_TESTS: 1
         run: |
           mkdir -p ./coverage
-          sudo go test -coverprofile=./coverage/coverage-${{ github.job }}-${{ matrix.os }}.txt -covermode=atomic ${TESTFLAGS} ./...
+          go test -coverprofile=./coverage/coverage-${{ github.job }}-${{ matrix.os }}.txt -covermode=atomic ${TESTFLAGS} ./...
         shell: bash
       -
         name: Upload coverage file
