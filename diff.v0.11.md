@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..aea4367 100644
+index 40d60dc..e35951f 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -22,10 +22,16 @@ on:
@@ -42,6 +42,18 @@ index 40d60dc..aea4367 100644
  
    test-os:
      runs-on: ${{ matrix.os }}
+@@ -234,9 +246,9 @@ jobs:
+       fail-fast: false
+       matrix:
+         os:
+-          # - ubuntu-20.04
++          - ubuntu-20.04
+           # - macOS-11
+-          - windows-2022
++          # - windows-2022
+     steps:
+       -
+         name: Checkout
 @@ -321,10 +333,14 @@ jobs:
          run: |
            ./hack/cross
@@ -1536,18 +1548,18 @@ index 1502fd2..4e3f7d8 100755
 +  $platformFlag $cacheFromFlags \
    $currentcontext
 diff --git upstream/v0.11/hack/images origin/v0.11/hack/images
-index d1315e6..090edc5 100755
+index d1315e6..a532808 100755
 --- upstream/v0.11/hack/images
 +++ origin/v0.11/hack/images
 @@ -52,8 +52,12 @@ if [ -n "$localmode" ]; then
  fi
  
  targetFlag=""
-+secrets=""
++secrets="--secret id=ARTIFACTORY_APT_AUTH_CONF --secret id=ARTIFACTORY_BASE64_GPG"
  if [ -n "$TARGET" ]; then
    targetFlag="--target=$TARGET"
 +  if [[ "$TARGET" == "rootless" ]]; then
-+    secrets="--secret id=ARTIFACTORY_ACCESS_TOKEN --secret id=ARTIFACTORY_APT_AUTH_CONF --secret id=ARTIFACTORY_BASE64_GPG --secret id=ARTIFACTORY_URL"
++    secrets="${secrets} --secret id=ARTIFACTORY_ACCESS_TOKEN --secret id=ARTIFACTORY_URL"
 +  fi
  fi
  
