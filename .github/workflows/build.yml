@@ -270,7 +270,7 @@ jobs:
           SKIP_INTEGRATION_TESTS: 1
         run: |
           mkdir -p ./coverage
-          go test -coverprofile=./coverage/coverage-${{ github.job }}-${{ matrix.os }}.txt -covermode=atomic ${TESTFLAGS} ./...
+          sudo go test -coverprofile=./coverage/coverage-${{ github.job }}-${{ matrix.os }}.txt -covermode=atomic ${TESTFLAGS} ./...
         shell: bash
       -
         name: Upload coverage file
