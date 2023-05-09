@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..e35951f 100644
+index 40d60dc..615a127 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -22,10 +22,16 @@ on:
@@ -54,6 +54,15 @@ index 40d60dc..e35951f 100644
      steps:
        -
          name: Checkout
+@@ -258,7 +270,7 @@ jobs:
+           SKIP_INTEGRATION_TESTS: 1
+         run: |
+           mkdir -p ./coverage
+-          go test -coverprofile=./coverage/coverage-${{ github.job }}-${{ matrix.os }}.txt -covermode=atomic ${TESTFLAGS} ./...
++          sudo go test -coverprofile=./coverage/coverage-${{ github.job }}-${{ matrix.os }}.txt -covermode=atomic ${TESTFLAGS} ./...
+         shell: bash
+       -
+         name: Upload coverage file
 @@ -321,10 +333,14 @@ jobs:
          run: |
            ./hack/cross
