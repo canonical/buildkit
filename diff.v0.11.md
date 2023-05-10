@@ -392,7 +392,7 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index 2100661..6b6aec2 100644
+index 2100661..780f47b 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
 @@ -1,62 +1,67 @@
@@ -537,7 +537,7 @@ index 2100661..6b6aec2 100644
  WORKDIR /work
  ARG TARGETPLATFORM
  RUN --mount=from=binaries \
-@@ -130,15 +135,28 @@ RUN --mount=from=binaries \
+@@ -130,15 +135,27 @@ RUN --mount=from=binaries \
  FROM scratch AS release
  COPY --link --from=releaser /out/ /
  
@@ -550,15 +550,14 @@ index 2100661..6b6aec2 100644
 +# TODO: get fuse* from Artifactory once available
 +RUN --mount=type=secret,required=true,id=ARTIFACTORY_APT_AUTH_CONF,mode=600,target=/etc/apt/auth.conf.d/artifactory.conf \
 +  --mount=type=secret,required=true,id=ARTIFACTORY_BASE64_GPG \
-+  apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 \
-+  && mv /etc/apt/sources.list /etc/apt/sources.list.backup \
++  mv /etc/apt/sources.list /etc/apt/sources.list.backup \
 +  && ls /etc/apt/auth.conf.d \
 +  && cat /run/secrets/ARTIFACTORY_BASE64_GPG | base64 -d > /etc/apt/trusted.gpg.d/artifactory.gpg \
 +  && echo "deb [signed-by=/etc/apt/trusted.gpg.d/artifactory.gpg] https://canonical.jfrog.io/artifactory/soss-deb-stable/ focal main" > /etc/apt/sources.list \
 +  && apt update -o Acquire::https::Verify-Peer=false \
 +  && DEBIAN_FRONTEND=noninteractive apt install -y ca-certificates -o Acquire::https::Verify-Peer=false \
 +  && apt update \
-+  && DEBIAN_FRONTEND=noninteractive apt install -y git openssh-server pigz xz-utils runc=${RUNC_VERSION} \
++  && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils runc=${RUNC_VERSION} \
 +  && mv /etc/apt/sources.list.backup /etc/apt/sources.list \
 +  && rm /etc/apt/trusted.gpg.d/artifactory.gpg \
 +  && rm -rf /var/lib/apt/lists/*
@@ -571,7 +570,7 @@ index 2100661..6b6aec2 100644
  WORKDIR /usr/src
  RUN git clone https://github.com/containerd/containerd.git containerd
  
-@@ -146,7 +164,7 @@ FROM gobuild-base AS containerd-base
+@@ -146,7 +163,7 @@ FROM gobuild-base AS containerd-base
  WORKDIR /go/src/github.com/containerd/containerd
  ARG TARGETPLATFORM
  ENV CGO_ENABLED=1 BUILDTAGS=no_btrfs GO111MODULE=off
@@ -580,7 +579,7 @@ index 2100661..6b6aec2 100644
  
  FROM containerd-base AS containerd
  ARG CONTAINERD_VERSION
-@@ -173,11 +191,21 @@ FROM registry:$REGISTRY_VERSION AS registry
+@@ -173,11 +190,21 @@ FROM registry:$REGISTRY_VERSION AS registry
  
  FROM gobuild-base AS rootlesskit
  ARG ROOTLESSKIT_VERSION
@@ -604,7 +603,7 @@ index 2100661..6b6aec2 100644
    CGO_ENABLED=0 xx-go build -o /rootlesskit ./cmd/rootlesskit && \
    xx-verify --static /rootlesskit
  
-@@ -205,14 +233,14 @@ FROM buildkit-export AS buildkit-linux
+@@ -205,14 +232,14 @@ FROM buildkit-export AS buildkit-linux
  COPY --link --from=binaries / /usr/bin/
  ENTRYPOINT ["buildkitd"]
  
@@ -625,7 +624,7 @@ index 2100661..6b6aec2 100644
  ARG CNI_VERSION
  ARG TARGETOS
  ARG TARGETARCH
-@@ -223,7 +251,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
+@@ -223,7 +250,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
  FROM buildkit-base AS integration-tests-base
  ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
  ARG NERDCTL_VERSION
@@ -636,7 +635,7 @@ index 2100661..6b6aec2 100644
    && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
    && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
    && mkdir -m 0700 -p /run/user/1000 \
-@@ -242,10 +272,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
+@@ -242,10 +271,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
  ENV CGO_ENABLED=0
  COPY --link --from=nydus /out/nydus-static/* /usr/bin/
  COPY --link --from=stargz-snapshotter /out/* /usr/bin/
@@ -649,7 +648,7 @@ index 2100661..6b6aec2 100644
  COPY --link --from=containerd /out/containerd* /usr/bin/
  COPY --link --from=cni-plugins /opt/cni/bin/bridge /opt/cni/bin/host-local /opt/cni/bin/loopback /opt/cni/bin/firewall /opt/cni/bin/dnsname /opt/cni/bin/
  COPY --link hack/fixtures/cni.json /etc/buildkit/cni.json
-@@ -261,13 +291,31 @@ FROM integration-tests AS dev-env
+@@ -261,13 +290,30 @@ FROM integration-tests AS dev-env
  VOLUME /var/lib/buildkit
  
  # Rootless mode.
@@ -661,15 +660,14 @@ index 2100661..6b6aec2 100644
 +# TODO: get fuse* from Artifactory once available
 +RUN --mount=type=secret,required=true,id=ARTIFACTORY_APT_AUTH_CONF,mode=600,target=/etc/apt/auth.conf.d/artifactory.conf \
 +  --mount=type=secret,required=true,id=ARTIFACTORY_BASE64_GPG \
-+  apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs \
-+  && mv /etc/apt/sources.list /etc/apt/sources.list.backup \
++  mv /etc/apt/sources.list /etc/apt/sources.list.backup \
 +  && ls /etc/apt/auth.conf.d \
 +  && cat /run/secrets/ARTIFACTORY_BASE64_GPG | base64 -d > /etc/apt/trusted.gpg.d/artifactory.gpg \
 +  && echo "deb [signed-by=/etc/apt/trusted.gpg.d/artifactory.gpg] https://canonical.jfrog.io/artifactory/soss-deb-stable/ focal main" > /etc/apt/sources.list \
 +  && apt update -o Acquire::https::Verify-Peer=false \
 +  && DEBIAN_FRONTEND=noninteractive apt install -y ca-certificates -o Acquire::https::Verify-Peer=false \
 +  && apt update \
-+  && DEBIAN_FRONTEND=noninteractive apt install -y git openssh-server pigz uidmap xz-utils \
++  && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils \
 +  && mv /etc/apt/sources.list.backup /etc/apt/sources.list \
 +  && rm /etc/apt/trusted.gpg.d/artifactory.gpg \
 +  && rm -rf /var/lib/apt/lists/*
