@@ -141,15 +141,14 @@ SHELL ["/bin/bash", "-oeux", "pipefail", "-c"]
 # TODO: get fuse* from Artifactory once available
 RUN --mount=type=secret,required=true,id=ARTIFACTORY_APT_AUTH_CONF,mode=600,target=/etc/apt/auth.conf.d/artifactory.conf \
   --mount=type=secret,required=true,id=ARTIFACTORY_BASE64_GPG \
-  apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 \
-  && mv /etc/apt/sources.list /etc/apt/sources.list.backup \
+  mv /etc/apt/sources.list /etc/apt/sources.list.backup \
   && ls /etc/apt/auth.conf.d \
   && cat /run/secrets/ARTIFACTORY_BASE64_GPG | base64 -d > /etc/apt/trusted.gpg.d/artifactory.gpg \
   && echo "deb [signed-by=/etc/apt/trusted.gpg.d/artifactory.gpg] https://canonical.jfrog.io/artifactory/soss-deb-stable/ focal main" > /etc/apt/sources.list \
   && apt update -o Acquire::https::Verify-Peer=false \
   && DEBIAN_FRONTEND=noninteractive apt install -y ca-certificates -o Acquire::https::Verify-Peer=false \
   && apt update \
-  && DEBIAN_FRONTEND=noninteractive apt install -y git openssh-server pigz xz-utils runc=${RUNC_VERSION} \
+  && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 git openssh-server pigz xz-utils runc=${RUNC_VERSION} \
   && mv /etc/apt/sources.list.backup /etc/apt/sources.list \
   && rm /etc/apt/trusted.gpg.d/artifactory.gpg \
   && rm -rf /var/lib/apt/lists/*
@@ -296,15 +295,14 @@ SHELL ["/bin/bash", "-oeux", "pipefail", "-c"]
 # TODO: get fuse* from Artifactory once available
 RUN --mount=type=secret,required=true,id=ARTIFACTORY_APT_AUTH_CONF,mode=600,target=/etc/apt/auth.conf.d/artifactory.conf \
   --mount=type=secret,required=true,id=ARTIFACTORY_BASE64_GPG \
-  apt update && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs \
-  && mv /etc/apt/sources.list /etc/apt/sources.list.backup \
+  mv /etc/apt/sources.list /etc/apt/sources.list.backup \
   && ls /etc/apt/auth.conf.d \
   && cat /run/secrets/ARTIFACTORY_BASE64_GPG | base64 -d > /etc/apt/trusted.gpg.d/artifactory.gpg \
   && echo "deb [signed-by=/etc/apt/trusted.gpg.d/artifactory.gpg] https://canonical.jfrog.io/artifactory/soss-deb-stable/ focal main" > /etc/apt/sources.list \
   && apt update -o Acquire::https::Verify-Peer=false \
   && DEBIAN_FRONTEND=noninteractive apt install -y ca-certificates -o Acquire::https::Verify-Peer=false \
   && apt update \
-  && DEBIAN_FRONTEND=noninteractive apt install -y git openssh-server pigz uidmap xz-utils \
+  && DEBIAN_FRONTEND=noninteractive apt install -y fuse3 fuse-overlayfs git openssh-server pigz uidmap xz-utils \
   && mv /etc/apt/sources.list.backup /etc/apt/sources.list \
   && rm /etc/apt/trusted.gpg.d/artifactory.gpg \
   && rm -rf /var/lib/apt/lists/*
