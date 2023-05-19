@@ -1307,6 +1307,68 @@ index f825b1d..94b48a7 100644
  	return s, releaseAll, nil
  }
  
+diff --git upstream/v0.11/exporter/containerimage/writer.go origin/v0.11/exporter/containerimage/writer.go
+index 4cccd9d..068d869 100644
+--- upstream/v0.11/exporter/containerimage/writer.go
++++ origin/v0.11/exporter/containerimage/writer.go
+@@ -574,10 +574,11 @@ func (ic *ImageWriter) Applier() diff.Applier {
+ func defaultImageConfig() ([]byte, error) {
+ 	pl := platforms.Normalize(platforms.DefaultSpec())
+ 
+-	img := ocispecs.Image{}
+-	img.Architecture = pl.Architecture
+-	img.OS = pl.OS
+-	img.Variant = pl.Variant
++	img := ocispecs.Image{
++		Architecture: pl.Architecture,
++		OS:           pl.OS,
++		Variant:      pl.Variant,
++	}
+ 	img.RootFS.Type = "layers"
+ 	img.Config.WorkingDir = "/"
+ 	img.Config.Env = []string{"PATH=" + system.DefaultPathEnv(pl.OS)}
+@@ -586,12 +587,13 @@ func defaultImageConfig() ([]byte, error) {
+ }
+ 
+ func attestationsConfig(layers []ocispecs.Descriptor) ([]byte, error) {
+-	img := ocispecs.Image{}
+-	img.Architecture = intotoPlatform.Architecture
+-	img.OS = intotoPlatform.OS
+-	img.OSVersion = intotoPlatform.OSVersion
+-	img.OSFeatures = intotoPlatform.OSFeatures
+-	img.Variant = intotoPlatform.Variant
++	img := ocispecs.Image{
++		Architecture: intotoPlatform.Architecture,
++		OS:           intotoPlatform.OS,
++		OSVersion:    intotoPlatform.OSVersion,
++		OSFeatures:   intotoPlatform.OSFeatures,
++		Variant:      intotoPlatform.Variant,
++	}
+ 	img.RootFS.Type = "layers"
+ 	for _, layer := range layers {
+ 		img.RootFS.DiffIDs = append(img.RootFS.DiffIDs, digest.Digest(layer.Annotations["containerd.io/uncompressed"]))
+diff --git upstream/v0.11/frontend/dockerfile/dockerfile2llb/image.go origin/v0.11/frontend/dockerfile/dockerfile2llb/image.go
+index 5c3bdee..36b27aa 100644
+--- upstream/v0.11/frontend/dockerfile/dockerfile2llb/image.go
++++ origin/v0.11/frontend/dockerfile/dockerfile2llb/image.go
+@@ -20,10 +20,13 @@ func clone(src Image) Image {
+ }
+ 
+ func emptyImage(platform ocispecs.Platform) Image {
+-	img := Image{}
+-	img.Architecture = platform.Architecture
+-	img.OS = platform.OS
+-	img.Variant = platform.Variant
++	img := Image{
++		Image: ocispecs.Image{
++			Architecture: platform.Architecture,
++			OS:           platform.OS,
++			Variant:      platform.Variant,
++		},
++	}
+ 	img.RootFS.Type = "layers"
+ 	img.Config.WorkingDir = "/"
+ 	img.Config.Env = []string{"PATH=" + system.DefaultPathEnv(platform.OS)}
 diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
 index bb911e2..82f829c 100644
 --- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
@@ -1605,6 +1667,83 @@ index 7b2ffa3..929733d 100755
          docker cp $tarout $cid:/$release.tar
          if [ "$TEST_DOCKERD" = "1" ]; then
            docker cp "$TEST_DOCKERD_BINARY" $cid:/usr/bin/dockerd
+diff --git upstream/v0.11/session/session.go origin/v0.11/session/session.go
+index f56a187..50cb3b4 100644
+--- upstream/v0.11/session/session.go
++++ origin/v0.11/session/session.go
+@@ -4,7 +4,6 @@ import (
+ 	"context"
+ 	"net"
+ 	"strings"
+-	"sync"
+ 
+ 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+ 	"github.com/moby/buildkit/identity"
+@@ -37,16 +36,14 @@ type Attachable interface {
+ 
+ // Session is a long running connection between client and a daemon
+ type Session struct {
+-	mu          sync.Mutex // synchronizes conn run and close
+-	id          string
+-	name        string
+-	sharedKey   string
+-	ctx         context.Context
+-	cancelCtx   func()
+-	done        chan struct{}
+-	grpcServer  *grpc.Server
+-	conn        net.Conn
+-	closeCalled bool
++	id         string
++	name       string
++	sharedKey  string
++	ctx        context.Context
++	cancelCtx  func()
++	done       chan struct{}
++	grpcServer *grpc.Server
++	conn       net.Conn
+ }
+ 
+ // NewSession returns a new long running session
+@@ -102,11 +99,6 @@ func (s *Session) ID() string {
+ 
+ // Run activates the session
+ func (s *Session) Run(ctx context.Context, dialer Dialer) error {
+-	s.mu.Lock()
+-	if s.closeCalled {
+-		s.mu.Unlock()
+-		return nil
+-	}
+ 	ctx, cancel := context.WithCancel(ctx)
+ 	s.cancelCtx = cancel
+ 	s.done = make(chan struct{})
+@@ -126,18 +118,15 @@ func (s *Session) Run(ctx context.Context, dialer Dialer) error {
+ 	}
+ 	conn, err := dialer(ctx, "h2c", meta)
+ 	if err != nil {
+-		s.mu.Unlock()
+ 		return errors.Wrap(err, "failed to dial gRPC")
+ 	}
+ 	s.conn = conn
+-	s.mu.Unlock()
+ 	serve(ctx, s.grpcServer, conn)
+ 	return nil
+ }
+ 
+ // Close closes the session
+ func (s *Session) Close() error {
+-	s.mu.Lock()
+ 	if s.cancelCtx != nil && s.done != nil {
+ 		if s.conn != nil {
+ 			s.conn.Close()
+@@ -145,8 +134,6 @@ func (s *Session) Close() error {
+ 		s.grpcServer.Stop()
+ 		<-s.done
+ 	}
+-	s.closeCalled = true
+-	s.mu.Unlock()
+ 	return nil
+ }
+ 
 diff --git upstream/v0.11/snapshot/localmounter_unix.go origin/v0.11/snapshot/localmounter_unix.go
 index a4b7b1a..27cff3e 100644
 --- upstream/v0.11/snapshot/localmounter_unix.go
