@@ -1848,6 +1848,51 @@ index 0a99163..2d7e969 100644
  			defop, err := llb.NewDefinitionOp(ref.Definition())
  			if err != nil {
  				return nil, err
+diff --git upstream/v0.11/solver/llbsolver/provenance/predicate.go origin/v0.11/solver/llbsolver/provenance/predicate.go
+index f2f7c4e..a7b5a78 100644
+--- upstream/v0.11/solver/llbsolver/provenance/predicate.go
++++ origin/v0.11/solver/llbsolver/provenance/predicate.go
+@@ -64,15 +64,12 @@ func slsaMaterials(srcs Sources) ([]slsa.ProvenanceMaterial, error) {
+ 		if err != nil {
+ 			return nil, err
+ 		}
+-		material := slsa.ProvenanceMaterial{
++		out = append(out, slsa.ProvenanceMaterial{
+ 			URI: uri,
+-		}
+-		if s.Digest != "" {
+-			material.Digest = slsa.DigestSet{
++			Digest: slsa.DigestSet{
+ 				s.Digest.Algorithm().String(): s.Digest.Hex(),
+-			}
+-		}
+-		out = append(out, material)
++			},
++		})
+ 	}
+ 
+ 	for _, s := range srcs.Git {
+@@ -102,16 +99,12 @@ func slsaMaterials(srcs Sources) ([]slsa.ProvenanceMaterial, error) {
+ 			})
+ 		}
+ 		packageurl.NewPackageURL(packageurl.TypeOCI, "", s.Ref, "", q, "")
+-
+-		material := slsa.ProvenanceMaterial{
++		out = append(out, slsa.ProvenanceMaterial{
+ 			URI: s.Ref,
+-		}
+-		if s.Digest != "" {
+-			material.Digest = slsa.DigestSet{
++			Digest: slsa.DigestSet{
+ 				s.Digest.Algorithm().String(): s.Digest.Hex(),
+-			}
+-		}
+-		out = append(out, material)
++			},
++		})
+ 	}
+ 	return out, nil
+ }
 diff --git upstream/v0.11/solver/llbsolver/solver.go origin/v0.11/solver/llbsolver/solver.go
 index d65a9e6..2f7ba61 100644
 --- upstream/v0.11/solver/llbsolver/solver.go
