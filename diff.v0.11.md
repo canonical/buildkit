@@ -1667,6 +1667,22 @@ index 7b2ffa3..929733d 100755
          docker cp $tarout $cid:/$release.tar
          if [ "$TEST_DOCKERD" = "1" ]; then
            docker cp "$TEST_DOCKERD_BINARY" $cid:/usr/bin/dockerd
+diff --git upstream/v0.11/session/grpc.go origin/v0.11/session/grpc.go
+index 6fac82e..dd67c69 100644
+--- upstream/v0.11/session/grpc.go
++++ origin/v0.11/session/grpc.go
+@@ -112,11 +112,6 @@ func monitorHealth(ctx context.Context, cc *grpc.ClientConn, cancelConn func())
+ 			}
+ 
+ 			if err != nil {
+-				select {
+-				case <-ctx.Done():
+-					return
+-				default:
+-				}
+ 				if failedBefore {
+ 					bklog.G(ctx).Error("healthcheck failed fatally")
+ 					return
 diff --git upstream/v0.11/session/session.go origin/v0.11/session/session.go
 index f56a187..50cb3b4 100644
 --- upstream/v0.11/session/session.go
