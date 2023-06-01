@@ -377,6 +377,11 @@ jobs:
         target-stage:
           - ''
           # - rootless
+    env:
+      TARGET: ${{ matrix.target-stage }}
+      RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
+      CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}
+      CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
     steps:
       -
         name: Checkout
@@ -403,18 +408,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
-        name: Build ${{ needs.release-base.outputs.tag }}
+        name: Build local image for testing
         run: |
-          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" "${{ needs.release-base.outputs.push }}"
+          ./hack/images local "$REPO_SLUG_TARGET" "nopush"
         env:
-          RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          TARGET: ${{ matrix.target-stage }}
-          CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}
-          CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
           ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
           ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
           ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
           ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
+      -
+        name: Test buildkit image locally before pushing
+        env:
+          IMG_NAME: '${{ env.REPO_SLUG_TARGET }}:local'
+        run: |
+          set -ex
+          docker images ${IMG_NAME}
+      -
+        name: Push ${{ needs.release-base.outputs.tag }} to GHCR
+        if: needs.release-base.outputs.push == 'push'
+        run: |
+          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" push
+        env:
+          ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
+          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
+
+          # "${{ needs.release-base.outputs.tag }}"
 
   binaries:
     runs-on: ubuntu-20.04
