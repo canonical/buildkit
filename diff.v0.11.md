@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..aea4367 100644
+index 40d60dc..f2a56db 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -22,10 +22,16 @@ on:
@@ -58,6 +58,15 @@ index 40d60dc..aea4367 100644
  
    release-base:
      runs-on: ubuntu-20.04
+@@ -360,7 +376,7 @@ jobs:
+       matrix:
+         target-stage:
+           - ''
+-          - rootless
++          # - rootless
+     steps:
+       -
+         name: Checkout
 @@ -379,12 +395,13 @@ jobs:
            driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
            buildkitd-flags: --debug
@@ -392,17 +401,18 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index 2100661..780f47b 100644
+index 2100661..f4e606e 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
 @@ -1,62 +1,67 @@
  # syntax=docker/dockerfile-upstream:master
  
 -ARG RUNC_VERSION=v1.1.5
-+ARG RUNC_VERSION=1.1.4-0ubuntu1~20.04.1
++ARG RUNC_VERSION=1.1.0-0ubuntu1~20.04.2
  ARG CONTAINERD_VERSION=v1.6.18
  # containerd v1.5 for integration tests
- ARG CONTAINERD_ALT_VERSION_15=v1.5.18
+-ARG CONTAINERD_ALT_VERSION_15=v1.5.18
++ARG CONTAINERD_ALT_VERSION_15=v1.5.9
  ARG REGISTRY_VERSION=2.8.0
 -ARG ROOTLESSKIT_VERSION=v1.0.1
 +# ARG ROOTLESSKIT_VERSION=v1.0.1
