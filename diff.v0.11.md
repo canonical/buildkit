@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..f2a56db 100644
+index 40d60dc..7180240 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -22,10 +22,16 @@ on:
@@ -58,16 +58,20 @@ index 40d60dc..f2a56db 100644
  
    release-base:
      runs-on: ubuntu-20.04
-@@ -360,7 +376,7 @@ jobs:
+@@ -360,7 +376,11 @@ jobs:
        matrix:
          target-stage:
            - ''
 -          - rootless
 +          # - rootless
++    env:
++      TARGET: ${{ matrix.target-stage }}
++      RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
++      CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
      steps:
        -
          name: Checkout
-@@ -379,12 +395,13 @@ jobs:
+@@ -379,21 +399,45 @@ jobs:
            driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
            buildkitd-flags: --debug
        -
@@ -82,20 +86,47 @@ index 40d60dc..f2a56db 100644
 +          username: ${{ github.actor }}
 +          password: ${{ secrets.GITHUB_TOKEN }}
        -
-         name: Build ${{ needs.release-base.outputs.tag }}
+-        name: Build ${{ needs.release-base.outputs.tag }}
++        name: Build local image for testing
          run: |
-@@ -394,6 +411,10 @@ jobs:
-           TARGET: ${{ matrix.target-stage }}
-           CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}
-           CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
+-          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" "${{ needs.release-base.outputs.push }}"
++          ./hack/images local "$REPO_SLUG_TARGET" "nopush"
+         env:
+-          RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
+-          TARGET: ${{ matrix.target-stage }}
+-          CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}
+-          CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
++          # have CACHE_FROM here cause the "env" context is not available at the job level
++          CACHE_FROM: "type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}"
 +          ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
 +          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
 +          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
 +          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
++      -
++        name: Test buildkit image locally before pushing
++        env:
++          IMG_NAME: '${{ env.REPO_SLUG_TARGET }}:local'
++        run: |
++          set -ex
++          docker images ${IMG_NAME}
++      -
++        name: Push ${{ needs.release-base.outputs.tag }} to GHCR
++        if: needs.release-base.outputs.push == 'push'
++        run: |
++          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" push
++        env:
++          # have CACHE_FROM here cause the "env" context is not available at the job level
++          CACHE_FROM: "type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}"
++          ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
++          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
++          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
++          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
++
++          # "${{ needs.release-base.outputs.tag }}"
  
    binaries:
      runs-on: ubuntu-20.04
-@@ -421,7 +442,9 @@ jobs:
+@@ -421,7 +465,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -106,7 +137,7 @@ index 40d60dc..f2a56db 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -441,82 +464,83 @@ jobs:
+@@ -441,82 +487,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
@@ -1606,7 +1637,7 @@ index 1502fd2..4e3f7d8 100755
 +  $platformFlag $cacheFromFlags \
    $currentcontext
 diff --git upstream/v0.11/hack/images origin/v0.11/hack/images
-index d1315e6..a532808 100755
+index d1315e6..6886026 100755
 --- upstream/v0.11/hack/images
 +++ origin/v0.11/hack/images
 @@ -52,8 +52,12 @@ if [ -n "$localmode" ]; then
@@ -1627,8 +1658,9 @@ index d1315e6..a532808 100755
  fi
  
 -buildxCmd build $platformFlag $targetFlag $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
+-  $currentcontext
 +buildxCmd build $platformFlag $targetFlag $secrets $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
-   $currentcontext
++  $currentcontext --progress plain
 diff --git upstream/v0.11/hack/s3_test/docker-bake.hcl origin/v0.11/hack/s3_test/docker-bake.hcl
 index 351e84b..e9f7cdd 100644
 --- upstream/v0.11/hack/s3_test/docker-bake.hcl
