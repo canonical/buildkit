@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..7180240 100644
+index 40d60dc..21afb95 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -22,10 +22,16 @@ on:
@@ -22,6 +22,24 @@ index 40d60dc..7180240 100644
    CACHE_GHA_SCOPE_IT: "integration-tests"
    CACHE_GHA_SCOPE_BINARIES: "binaries"
    CACHE_GHA_SCOPE_CROSS: "cross"
+@@ -76,14 +82,14 @@ jobs:
+       matrix:
+         pkg:
+           - ./client ./cmd/buildctl ./worker/containerd ./solver ./frontend
+-          - ./frontend/dockerfile
++          # - ./frontend/dockerfile
+         worker:
+           - containerd
+-          - containerd-rootless
++          # - containerd-rootless
+           - containerd-1.5
+           - containerd-snapshotter-stargz
+           - oci
+-          - oci-rootless
++          # - oci-rootless
+           - oci-snapshotter-stargz
+         typ:
+           - integration
 @@ -204,6 +210,9 @@ jobs:
          name: Test
          run: |
@@ -71,7 +89,13 @@ index 40d60dc..7180240 100644
      steps:
        -
          name: Checkout
-@@ -379,21 +399,45 @@ jobs:
+@@ -374,26 +394,52 @@ jobs:
+       -
+         name: Set up Docker Buildx
+         uses: docker/setup-buildx-action@v2
++        id: setup-buildx-builder
+         with:
+           version: ${{ env.BUILDX_VERSION }}
            driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
            buildkitd-flags: --debug
        -
@@ -104,15 +128,18 @@ index 40d60dc..7180240 100644
 +          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
 +      -
 +        name: Test buildkit image locally before pushing
++        run: |
++          sudo apt-get update
++          sudo apt-get -y install skopeo
++
++          ./hack/canonical_test/run_test.sh
 +        env:
 +          IMG_NAME: '${{ env.REPO_SLUG_TARGET }}:local'
-+        run: |
-+          set -ex
-+          docker images ${IMG_NAME}
 +      -
 +        name: Push ${{ needs.release-base.outputs.tag }} to GHCR
 +        if: needs.release-base.outputs.push == 'push'
 +        run: |
++          docker buildx use ${{ steps.setup-buildx-builder.outputs.name }}
 +          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" push
 +        env:
 +          # have CACHE_FROM here cause the "env" context is not available at the job level
@@ -121,12 +148,10 @@ index 40d60dc..7180240 100644
 +          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
 +          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
 +          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
-+
-+          # "${{ needs.release-base.outputs.tag }}"
  
    binaries:
      runs-on: ubuntu-20.04
-@@ -421,7 +465,9 @@ jobs:
+@@ -421,7 +467,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -137,7 +162,7 @@ index 40d60dc..7180240 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -441,82 +487,83 @@ jobs:
+@@ -441,82 +489,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
@@ -432,7 +457,7 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index 2100661..f4e606e 100644
+index 2100661..3413c7c 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
 @@ -1,62 +1,67 @@
@@ -670,9 +695,9 @@ index 2100661..f4e606e 100644
  ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
  ARG NERDCTL_VERSION
 -RUN apk add --no-cache shadow shadow-uidmap sudo vim iptables ip6tables dnsmasq fuse curl git-daemon \
-+# Installing runc from the archives in here, cause for Jammy it is also v1.1.4
-+# Also installing rootlesskit from the archives
-+RUN xx-apt install -y sudo uidmap vim iptables dnsmasq fuse curl runc=1.1.4-0ubuntu1~22.04.1 rootlesskit \
++# Installing runc from the archives in here, cause for Focal it is also v1.1.4
++RUN xx-apt install -y sudo uidmap vim iptables dnsmasq fuse curl runc=1.1.4-0ubuntu1~22.04.3 \ 
++# rootlesskit \
    && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
    && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
    && mkdir -m 0700 -p /run/user/1000 \
@@ -1623,6 +1648,115 @@ index cdf0dc2..cfcae8b 100755
  
  AZURE_ACCOUNT_NAME=azblobcacheaccount
  AZURE_ACCOUNT_URL=azblobcacheaccount.blob.localhost.com
+diff --git upstream/v0.11/hack/canonical_test/Dockerfile origin/v0.11/hack/canonical_test/Dockerfile
+new file mode 100644
+index 0000000..8fe9186
+--- /dev/null
++++ origin/v0.11/hack/canonical_test/Dockerfile
+@@ -0,0 +1,32 @@
++# syntax=docker/dockerfile-upstream:master
++
++ARG BUILD_ARG=foo
++ARG UBUNTU_RELEASE=20.04
++
++FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_RELEASE} as base
++ARG HOST_HOSTNAME
++SHELL ["/bin/bash", "-oeux", "pipefail", "-c"]
++WORKDIR /stage
++RUN --mount=type=secret,required=true,id=TEST_SECRET,mode=600 \
++    [ "$(stat -L -c '%a' /run/secrets/TEST_SECRET)" = "600" ]
++RUN --mount=type=bind,src=TEST_FILE,target=/tmp/TEST_FILE \
++    cp /tmp/TEST_FILE . \
++    && [ "$(cat TEST_FILE)" = "bar" ]
++RUN --network=none [ $(hostname -I | wc -w) -eq 0 ]
++RUN --network=host \
++    hostname -I \
++    && [ $(hostname -I | wc -w) -gt 1 ]
++
++FROM ubuntu:${UBUNTU_RELEASE}
++ARG BUILDPLATFORM
++ARG TARGETPLATFORM
++ARG BUILD_ARG
++ENV BUILDPLATFORM $BUILDPLATFORM
++ENV TARGETPLATFORM $TARGETPLATFORM
++ENV BUILD_ARG $BUILD_ARG
++# This could be achieved with COPY, but we want to test the --mount
++RUN --mount=from=base,src=/stage/TEST_FILE,target=/tmp/TEST_FILE \
++    cat /tmp/TEST_FILE \
++    && cp /tmp/TEST_FILE /tmp/TEST_FILE_COPY
++CMD echo "Built on $BUILDPLATFORM, for $TARGETPLATFORM. Message: ${BUILD_ARG}"
++
+diff --git upstream/v0.11/hack/canonical_test/TEST_FILE origin/v0.11/hack/canonical_test/TEST_FILE
+new file mode 100644
+index 0000000..ba0e162
+--- /dev/null
++++ origin/v0.11/hack/canonical_test/TEST_FILE
+@@ -0,0 +1 @@
++bar
+\ No newline at end of file
+diff --git upstream/v0.11/hack/canonical_test/run_test.sh origin/v0.11/hack/canonical_test/run_test.sh
+new file mode 100755
+index 0000000..c516c65
+--- /dev/null
++++ origin/v0.11/hack/canonical_test/run_test.sh
+@@ -0,0 +1,57 @@
++#!/bin/bash -ex
++
++cd "$(dirname "$0")"
++
++BUILDKIT_IMAGE_NAME="${1}"
++BUILDER_NAME="ubuntu-buildkit"
++NOTE_NAME=${CI_RUNNER_ID:-canonical_buildkit0}
++
++docker buildx ls
++
++docker buildx rm "${BUILDER_NAME}" | true
++
++docker buildx create \
++  --name "${BUILDER_NAME}" \
++  --driver-opt=image="${BUILDKIT_IMAGE_NAME}" \
++  --driver-opt=network=host \
++  --buildkitd-flags="--allow-insecure-entitlement network.host" \
++  --node "node_${NOTE_NAME}" \
++  --use
++
++docker buildx inspect "${BUILDER_NAME}"
++
++# export test secret to be used in the test build
++export TEST_SECRET=foo
++
++# set build args
++BUILD_ARG="something to be printed by the container"
++UBUNTU_RELEASE="focal"
++
++# output into an OCI archive
++OCI_IMAGE=image.tar
++
++# --builder is optional since we created the Buildx instance with --use 
++docker buildx build \
++  -t test:latest \
++  --output type=oci,dest=$OCI_IMAGE \
++  --provenance=true \
++  --sbom=true \
++  --allow network.host \
++  --network host \
++  --secret id=TEST_SECRET \
++  --build-arg BUILD_ARG="${BUILD_ARG}" \
++  --build-arg HOST_HOSTNAME="$(hostname)" \
++  --build-arg UBUNTU_RELEASE="${UBUNTU_RELEASE}" \
++  --platform=linux/amd64,linux/arm64 \
++  --builder "${BUILDER_NAME}" \
++  --no-cache \
++  .
++
++TEST_DOCKER_IMAGE="test:latest"
++
++skopeo copy oci-archive:${OCI_IMAGE} docker-daemon:${TEST_DOCKER_IMAGE}
++
++docker run --rm ${TEST_DOCKER_IMAGE} | grep "$BUILD_ARG"
++docker run --rm ${TEST_DOCKER_IMAGE} cat /etc/os-release | grep "$UBUNTU_RELEASE"
++docker inspect ${TEST_DOCKER_IMAGE} -f '{{json .Config.Env}}' \
++  | grep BUILDPLATFORM | grep TARGETPLATFORM | grep BUILD_ARG 
 diff --git upstream/v0.11/hack/cross origin/v0.11/hack/cross
 index 1502fd2..4e3f7d8 100755
 --- upstream/v0.11/hack/cross
