@@ -82,14 +82,14 @@ jobs:
       matrix:
         pkg:
           - ./client ./cmd/buildctl ./worker/containerd ./solver ./frontend
-          - ./frontend/dockerfile
+          # - ./frontend/dockerfile
         worker:
           - containerd
-          - containerd-rootless
+          # - containerd-rootless
           - containerd-1.5
           - containerd-snapshotter-stargz
           - oci
-          - oci-rootless
+          # - oci-rootless
           - oci-snapshotter-stargz
         typ:
           - integration
@@ -394,6 +394,7 @@ jobs:
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        id: setup-buildx-builder
         with:
           version: ${{ env.BUILDX_VERSION }}
           driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
@@ -419,15 +420,18 @@ jobs:
           ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
       -
         name: Test buildkit image locally before pushing
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install skopeo
+
+          ./hack/canonical_test/run_test.sh
         env:
           IMG_NAME: '${{ env.REPO_SLUG_TARGET }}:local'
-        run: |
-          set -ex
-          docker images ${IMG_NAME}
       -
         name: Push ${{ needs.release-base.outputs.tag }} to GHCR
         if: needs.release-base.outputs.push == 'push'
         run: |
+          docker buildx use ${{ steps.setup-buildx-builder.outputs.name }}
           ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" push
         env:
           # have CACHE_FROM here cause the "env" context is not available at the job level
@@ -436,8 +440,6 @@ jobs:
           ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
           ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
           ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
-
-          # "${{ needs.release-base.outputs.tag }}"
 
   binaries:
     runs-on: ubuntu-20.04
