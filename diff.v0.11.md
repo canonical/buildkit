@@ -457,10 +457,10 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index 2100661..3413c7c 100644
+index a230998..3413c7c 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
-@@ -1,62 +1,67 @@
+@@ -1,63 +1,67 @@
  # syntax=docker/dockerfile-upstream:master
  
 -ARG RUNC_VERSION=v1.1.5
@@ -479,6 +479,7 @@ index 2100661..3413c7c 100644
  ARG DNSNAME_VERSION=v1.3.1
  ARG NYDUS_VERSION=v2.1.0
  
+-ARG GO_VERSION=1.19
 -ARG ALPINE_VERSION=3.17
 +ARG UBUNTU_VERSION=20.04
  
@@ -505,7 +506,7 @@ index 2100661..3413c7c 100644
  FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.2.1 AS xx
  
  # go base image
--FROM --platform=$BUILDPLATFORM golang:1.19-alpine${ALPINE_VERSION} AS golatest
+-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine${ALPINE_VERSION} AS golatest
 +# use Ubuntu instead of Golang cause xx-apt only works in Debian sid
 +# and Golang is only based on stable versions of Debian
 +# https://github.com/tonistiigi/xx/blob/3d00d096c8bf894ec29bae5caa5aea81d9c187a5/base/xx-apt#L41
@@ -560,7 +561,7 @@ index 2100661..3413c7c 100644
  
  # dnsname CNI plugin for testing
  FROM gobuild-base AS dnsname
-@@ -75,7 +80,7 @@ ENV GOFLAGS=-mod=vendor
+@@ -76,7 +80,7 @@ ENV GOFLAGS=-mod=vendor
  FROM buildkit-base AS buildkit-version
  # TODO: PKG should be inferred from go modules
  RUN --mount=target=. \
@@ -569,7 +570,7 @@ index 2100661..3413c7c 100644
    echo "-X ${PKG}/version.Version=${VERSION} -X ${PKG}/version.Revision=${REVISION} -X ${PKG}/version.Package=${PKG}" | tee /tmp/.ldflags; \
    echo -n "${VERSION}" | tee /tmp/.version;
  
-@@ -101,7 +106,7 @@ RUN --mount=target=. --mount=target=/root/.cache,type=cache \
+@@ -102,7 +106,7 @@ RUN --mount=target=. --mount=target=/root/.cache,type=cache \
    xx-verify --static /usr/bin/buildkitd
  
  FROM scratch AS binaries-linux-helper
@@ -578,7 +579,7 @@ index 2100661..3413c7c 100644
  # built from https://github.com/tonistiigi/binfmt/releases/tag/buildkit%2Fv7.1.0-30
  COPY --link --from=tonistiigi/binfmt:buildkit-v7.1.0-30@sha256:45dd57b4ba2f24e2354f71f1e4e51f073cb7a28fd848ce6f5f2a7701142a6bf0 / /
  
-@@ -109,18 +114,18 @@ FROM binaries-linux-helper AS binaries-linux
+@@ -110,18 +114,18 @@ FROM binaries-linux-helper AS binaries-linux
  COPY --link --from=buildctl /usr/bin/buildctl /
  COPY --link --from=buildkitd /usr/bin/buildkitd /
  
@@ -603,7 +604,7 @@ index 2100661..3413c7c 100644
  WORKDIR /work
  ARG TARGETPLATFORM
  RUN --mount=from=binaries \
-@@ -130,15 +135,27 @@ RUN --mount=from=binaries \
+@@ -131,15 +135,27 @@ RUN --mount=from=binaries \
  FROM scratch AS release
  COPY --link --from=releaser /out/ /
  
@@ -636,7 +637,7 @@ index 2100661..3413c7c 100644
  WORKDIR /usr/src
  RUN git clone https://github.com/containerd/containerd.git containerd
  
-@@ -146,7 +163,7 @@ FROM gobuild-base AS containerd-base
+@@ -147,7 +163,7 @@ FROM gobuild-base AS containerd-base
  WORKDIR /go/src/github.com/containerd/containerd
  ARG TARGETPLATFORM
  ENV CGO_ENABLED=1 BUILDTAGS=no_btrfs GO111MODULE=off
@@ -645,7 +646,7 @@ index 2100661..3413c7c 100644
  
  FROM containerd-base AS containerd
  ARG CONTAINERD_VERSION
-@@ -173,11 +190,21 @@ FROM registry:$REGISTRY_VERSION AS registry
+@@ -174,11 +190,21 @@ FROM registry:$REGISTRY_VERSION AS registry
  
  FROM gobuild-base AS rootlesskit
  ARG ROOTLESSKIT_VERSION
@@ -669,7 +670,7 @@ index 2100661..3413c7c 100644
    CGO_ENABLED=0 xx-go build -o /rootlesskit ./cmd/rootlesskit && \
    xx-verify --static /rootlesskit
  
-@@ -205,14 +232,14 @@ FROM buildkit-export AS buildkit-linux
+@@ -206,14 +232,14 @@ FROM buildkit-export AS buildkit-linux
  COPY --link --from=binaries / /usr/bin/
  ENTRYPOINT ["buildkitd"]
  
@@ -690,7 +691,7 @@ index 2100661..3413c7c 100644
  ARG CNI_VERSION
  ARG TARGETOS
  ARG TARGETARCH
-@@ -223,7 +250,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
+@@ -224,7 +250,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
  FROM buildkit-base AS integration-tests-base
  ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
  ARG NERDCTL_VERSION
@@ -701,7 +702,7 @@ index 2100661..3413c7c 100644
    && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
    && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
    && mkdir -m 0700 -p /run/user/1000 \
-@@ -242,10 +271,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
+@@ -243,10 +271,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
  ENV CGO_ENABLED=0
  COPY --link --from=nydus /out/nydus-static/* /usr/bin/
  COPY --link --from=stargz-snapshotter /out/* /usr/bin/
@@ -714,7 +715,7 @@ index 2100661..3413c7c 100644
  COPY --link --from=containerd /out/containerd* /usr/bin/
  COPY --link --from=cni-plugins /opt/cni/bin/bridge /opt/cni/bin/host-local /opt/cni/bin/loopback /opt/cni/bin/firewall /opt/cni/bin/dnsname /opt/cni/bin/
  COPY --link hack/fixtures/cni.json /etc/buildkit/cni.json
-@@ -261,13 +290,30 @@ FROM integration-tests AS dev-env
+@@ -262,13 +290,30 @@ FROM integration-tests AS dev-env
  VOLUME /var/lib/buildkit
  
  # Rootless mode.
@@ -1822,10 +1823,26 @@ index a2b2d4d..afa3ce1 100755
  docker run --rm --privileged -p 9001:9001 -p 8060:8060 moby/buildkit:s3test /test/test.sh
  docker rmi moby/buildkit:s3test
 diff --git upstream/v0.11/hack/test origin/v0.11/hack/test
-index 7b2ffa3..929733d 100755
+index cf928f7..929733d 100755
 --- upstream/v0.11/hack/test
 +++ origin/v0.11/hack/test
-@@ -72,7 +72,7 @@ if ! docker container inspect "$cacheVolume" >/dev/null 2>/dev/null; then
+@@ -3,7 +3,6 @@
+ . $(dirname $0)/util
+ set -eu -o pipefail
+ 
+-: ${GO_VERSION=}
+ : ${TEST_INTEGRATION=}
+ : ${TEST_GATEWAY=}
+ : ${TEST_DOCKERFILE=}
+@@ -62,7 +61,6 @@ if [ "$TEST_COVERAGE" = "1" ]; then
+ fi
+ 
+ buildxCmd build $cacheFromFlags \
+-  --build-arg GO_VERSION \
+   --build-arg "BUILDKITD_TAGS=$BUILDKITD_TAGS" \
+   --target "integration-tests" \
+   --output "type=docker,name=$iid" \
+@@ -74,7 +72,7 @@ if ! docker container inspect "$cacheVolume" >/dev/null 2>/dev/null; then
  fi
  
  if [ "$TEST_INTEGRATION" == 1 ]; then
@@ -1834,7 +1851,7 @@ index 7b2ffa3..929733d 100755
    if [ "$TEST_DOCKERD" = "1" ]; then
      docker cp "$TEST_DOCKERD_BINARY" $cid:/usr/bin/dockerd
    fi
-@@ -112,7 +112,7 @@ if [ "$TEST_DOCKERFILE" == 1 ]; then
+@@ -114,7 +112,7 @@ if [ "$TEST_DOCKERFILE" == 1 ]; then
  
      if [ -s $tarout ]; then
        if [ "$release" = "mainline" ] || [ "$release" = "labs" ] || [ -n "$DOCKERFILE_RELEASES_CUSTOM" ] || [ "$GITHUB_ACTIONS" = "true" ]; then
