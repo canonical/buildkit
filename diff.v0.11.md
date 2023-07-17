@@ -457,15 +457,16 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index a230998..3413c7c 100644
+index 9a41040..3413c7c 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
 @@ -1,63 +1,67 @@
  # syntax=docker/dockerfile-upstream:master
  
--ARG RUNC_VERSION=v1.1.5
+-ARG RUNC_VERSION=v1.1.7
+-ARG CONTAINERD_VERSION=v1.6.21
 +ARG RUNC_VERSION=1.1.0-0ubuntu1~20.04.2
- ARG CONTAINERD_VERSION=v1.6.18
++ARG CONTAINERD_VERSION=v1.6.18
  # containerd v1.5 for integration tests
 -ARG CONTAINERD_ALT_VERSION_15=v1.5.18
 +ARG CONTAINERD_ALT_VERSION_15=v1.5.9
