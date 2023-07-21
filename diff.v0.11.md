@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index 40d60dc..21afb95 100644
+index c8e4b9b..21afb95 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -22,10 +22,16 @@ on:
@@ -40,27 +40,66 @@ index 40d60dc..21afb95 100644
            - oci-snapshotter-stargz
          typ:
            - integration
-@@ -204,6 +210,9 @@ jobs:
-         name: Test
-         run: |
-           hack/s3_test/run_test.sh
+@@ -182,6 +188,58 @@ jobs:
+           SKIP_INTEGRATION_TESTS: ${{ matrix.skip-integration-tests }}
+           CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_IT }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }}
+ 
++  test-s3:
++    runs-on: ubuntu-20.04
++    needs:
++      - base
++    steps:
++      -
++        name: Checkout
++        uses: actions/checkout@v3
++      -
++        name: Expose GitHub Runtime
++        uses: crazy-max/ghaction-github-runtime@v2
++      -
++        name: Set up Docker Buildx
++        uses: docker/setup-buildx-action@v2
++        with:
++          version: ${{ env.BUILDX_VERSION }}
++          driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
++          buildkitd-flags: --debug
++      -
++        name: Test
++        run: |
++          hack/s3_test/run_test.sh
 +        env:
 +          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
 +          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
- 
-   test-azblob:
-     runs-on: ubuntu-20.04
-@@ -227,6 +236,9 @@ jobs:
-         name: Test
-         run: |
-           hack/azblob_test/run_test.sh
++
++  test-azblob:
++    runs-on: ubuntu-20.04
++    needs:
++      - base
++    steps:
++      -
++        name: Checkout
++        uses: actions/checkout@v3
++      -
++        name: Expose GitHub Runtime
++        uses: crazy-max/ghaction-github-runtime@v2
++      -
++        name: Set up Docker Buildx
++        uses: docker/setup-buildx-action@v2
++        with:
++          version: ${{ env.BUILDX_VERSION }}
++          driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
++          buildkitd-flags: --debug
++      -
++        name: Test
++        run: |
++          hack/azblob_test/run_test.sh
 +        env:
 +          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
 +          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
- 
++
    test-os:
      runs-on: ${{ matrix.os }}
-@@ -321,10 +333,14 @@ jobs:
+     strategy:
+@@ -275,10 +333,14 @@ jobs:
          run: |
            ./hack/cross
          env:
@@ -76,7 +115,7 @@ index 40d60dc..21afb95 100644
  
    release-base:
      runs-on: ubuntu-20.04
-@@ -360,7 +376,11 @@ jobs:
+@@ -314,7 +376,11 @@ jobs:
        matrix:
          target-stage:
            - ''
@@ -89,7 +128,7 @@ index 40d60dc..21afb95 100644
      steps:
        -
          name: Checkout
-@@ -374,26 +394,52 @@ jobs:
+@@ -328,26 +394,52 @@ jobs:
        -
          name: Set up Docker Buildx
          uses: docker/setup-buildx-action@v2
@@ -151,7 +190,7 @@ index 40d60dc..21afb95 100644
  
    binaries:
      runs-on: ubuntu-20.04
-@@ -421,7 +467,9 @@ jobs:
+@@ -375,7 +467,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -162,7 +201,7 @@ index 40d60dc..21afb95 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -441,82 +489,83 @@ jobs:
+@@ -395,82 +489,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
@@ -457,10 +496,10 @@ index 21bdc61..75513ab 100644
    BUILDX_VERSION: "v0.9.1"  # leave empty to use the one available on GitHub virtual environment
  
 diff --git upstream/v0.11/Dockerfile origin/v0.11/Dockerfile
-index 9a41040..3413c7c 100644
+index 3f31d3c..3413c7c 100644
 --- upstream/v0.11/Dockerfile
 +++ origin/v0.11/Dockerfile
-@@ -1,63 +1,67 @@
+@@ -1,70 +1,67 @@
  # syntax=docker/dockerfile-upstream:master
  
 -ARG RUNC_VERSION=v1.1.7
@@ -479,11 +518,17 @@ index 9a41040..3413c7c 100644
  ARG NERDCTL_VERSION=v1.0.0
  ARG DNSNAME_VERSION=v1.3.1
  ARG NYDUS_VERSION=v2.1.0
- 
+-ARG MINIO_VERSION=RELEASE.2022-05-03T20-36-08Z
+-ARG MINIO_MC_VERSION=RELEASE.2022-05-04T06-07-55Z
+-ARG AZURITE_VERSION=3.18.0
+-
 -ARG GO_VERSION=1.19
 -ARG ALPINE_VERSION=3.17
-+ARG UBUNTU_VERSION=20.04
- 
+-
+-# minio for s3 integration tests
+-FROM minio/minio:${MINIO_VERSION} AS minio
+-FROM minio/mc:${MINIO_MC_VERSION} AS minio-mc
+-
 -# alpine base for buildkit image
 -# TODO: remove this when alpine image supports riscv64
 -FROM alpine:${ALPINE_VERSION} AS alpine-amd64
@@ -493,6 +538,9 @@ index 9a41040..3413c7c 100644
 -FROM alpine:${ALPINE_VERSION} AS alpine-ppc64le
 -FROM alpine:edge@sha256:c223f84e05c23c0571ce8decefef818864869187e1a3ea47719412e205c8c64e AS alpine-riscv64
 -FROM alpine-$TARGETARCH AS alpinebase
++
++ARG UBUNTU_VERSION=20.04
++
 +# ubuntu base for buildkit image
 +# TODO: remove this when ubuntu image supports riscv64 again
 +FROM amd64/ubuntu:${UBUNTU_VERSION} AS ubuntu-amd64
@@ -562,7 +610,7 @@ index 9a41040..3413c7c 100644
  
  # dnsname CNI plugin for testing
  FROM gobuild-base AS dnsname
-@@ -76,7 +80,7 @@ ENV GOFLAGS=-mod=vendor
+@@ -83,7 +80,7 @@ ENV GOFLAGS=-mod=vendor
  FROM buildkit-base AS buildkit-version
  # TODO: PKG should be inferred from go modules
  RUN --mount=target=. \
@@ -571,7 +619,7 @@ index 9a41040..3413c7c 100644
    echo "-X ${PKG}/version.Version=${VERSION} -X ${PKG}/version.Revision=${REVISION} -X ${PKG}/version.Package=${PKG}" | tee /tmp/.ldflags; \
    echo -n "${VERSION}" | tee /tmp/.version;
  
-@@ -102,7 +106,7 @@ RUN --mount=target=. --mount=target=/root/.cache,type=cache \
+@@ -109,7 +106,7 @@ RUN --mount=target=. --mount=target=/root/.cache,type=cache \
    xx-verify --static /usr/bin/buildkitd
  
  FROM scratch AS binaries-linux-helper
@@ -580,7 +628,7 @@ index 9a41040..3413c7c 100644
  # built from https://github.com/tonistiigi/binfmt/releases/tag/buildkit%2Fv7.1.0-30
  COPY --link --from=tonistiigi/binfmt:buildkit-v7.1.0-30@sha256:45dd57b4ba2f24e2354f71f1e4e51f073cb7a28fd848ce6f5f2a7701142a6bf0 / /
  
-@@ -110,18 +114,18 @@ FROM binaries-linux-helper AS binaries-linux
+@@ -117,18 +114,18 @@ FROM binaries-linux-helper AS binaries-linux
  COPY --link --from=buildctl /usr/bin/buildctl /
  COPY --link --from=buildkitd /usr/bin/buildkitd /
  
@@ -605,7 +653,7 @@ index 9a41040..3413c7c 100644
  WORKDIR /work
  ARG TARGETPLATFORM
  RUN --mount=from=binaries \
-@@ -131,15 +135,27 @@ RUN --mount=from=binaries \
+@@ -138,15 +135,27 @@ RUN --mount=from=binaries \
  FROM scratch AS release
  COPY --link --from=releaser /out/ /
  
@@ -638,7 +686,7 @@ index 9a41040..3413c7c 100644
  WORKDIR /usr/src
  RUN git clone https://github.com/containerd/containerd.git containerd
  
-@@ -147,7 +163,7 @@ FROM gobuild-base AS containerd-base
+@@ -154,7 +163,7 @@ FROM gobuild-base AS containerd-base
  WORKDIR /go/src/github.com/containerd/containerd
  ARG TARGETPLATFORM
  ENV CGO_ENABLED=1 BUILDTAGS=no_btrfs GO111MODULE=off
@@ -647,7 +695,7 @@ index 9a41040..3413c7c 100644
  
  FROM containerd-base AS containerd
  ARG CONTAINERD_VERSION
-@@ -174,11 +190,21 @@ FROM registry:$REGISTRY_VERSION AS registry
+@@ -181,11 +190,21 @@ FROM registry:$REGISTRY_VERSION AS registry
  
  FROM gobuild-base AS rootlesskit
  ARG ROOTLESSKIT_VERSION
@@ -671,7 +719,7 @@ index 9a41040..3413c7c 100644
    CGO_ENABLED=0 xx-go build -o /rootlesskit ./cmd/rootlesskit && \
    xx-verify --static /rootlesskit
  
-@@ -206,14 +232,14 @@ FROM buildkit-export AS buildkit-linux
+@@ -213,14 +232,14 @@ FROM buildkit-export AS buildkit-linux
  COPY --link --from=binaries / /usr/bin/
  ENTRYPOINT ["buildkitd"]
  
@@ -692,19 +740,38 @@ index 9a41040..3413c7c 100644
  ARG CNI_VERSION
  ARG TARGETOS
  ARG TARGETARCH
-@@ -224,7 +250,9 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
+@@ -230,19 +249,18 @@ COPY --link --from=dnsname /usr/bin/dnsname /opt/cni/bin/
+ 
  FROM buildkit-base AS integration-tests-base
  ENV BUILDKIT_INTEGRATION_ROOTLESS_IDPAIR="1000:1000"
- ARG NERDCTL_VERSION
 -RUN apk add --no-cache shadow shadow-uidmap sudo vim iptables ip6tables dnsmasq fuse curl git-daemon \
++ARG NERDCTL_VERSION
 +# Installing runc from the archives in here, cause for Focal it is also v1.1.4
 +RUN xx-apt install -y sudo uidmap vim iptables dnsmasq fuse curl runc=1.1.4-0ubuntu1~22.04.3 \ 
 +# rootlesskit \
    && useradd --create-home --home-dir /home/user --uid 1000 -s /bin/sh user \
    && echo "XDG_RUNTIME_DIR=/run/user/1000; export XDG_RUNTIME_DIR" >> /home/user/.profile \
    && mkdir -m 0700 -p /run/user/1000 \
-@@ -243,10 +271,10 @@ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
+   && chown -R user /run/user/1000 /home/user \
+   && ln -s /sbin/iptables-legacy /usr/bin/iptables \
+-  && xx-go --wrap
+-ARG NERDCTL_VERSION
+-RUN curl -Ls https://raw.githubusercontent.com/containerd/nerdctl/$NERDCTL_VERSION/extras/rootless/containerd-rootless.sh > /usr/bin/containerd-rootless.sh \
++  && xx-go --wrap \
++  && curl -Ls https://raw.githubusercontent.com/containerd/nerdctl/$NERDCTL_VERSION/extras/rootless/containerd-rootless.sh > /usr/bin/containerd-rootless.sh \
+   && chmod 0755 /usr/bin/containerd-rootless.sh
+-ARG AZURITE_VERSION
+-RUN apk add --no-cache nodejs npm \
+-  && npm install -g azurite@${AZURITE_VERSION}
+ # The entrypoint script is needed for enabling nested cgroup v2 (https://github.com/moby/buildkit/issues/3265#issuecomment-1309631736)
+ RUN curl -Ls https://raw.githubusercontent.com/moby/moby/v20.10.21/hack/dind > /docker-entrypoint.sh \
+   && chmod 0755 /docker-entrypoint.sh
+@@ -251,14 +269,12 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
+ ENV BUILDKIT_INTEGRATION_CONTAINERD_EXTRA="containerd-1.5=/opt/containerd-alt-15/bin"
+ ENV BUILDKIT_INTEGRATION_SNAPSHOTTER=stargz
  ENV CGO_ENABLED=0
+-COPY --link --from=minio /opt/bin/minio /usr/bin/
+-COPY --link --from=minio-mc /usr/bin/mc /usr/bin/
  COPY --link --from=nydus /out/nydus-static/* /usr/bin/
  COPY --link --from=stargz-snapshotter /out/* /usr/bin/
 -COPY --link --from=rootlesskit /rootlesskit /usr/bin/
@@ -716,7 +783,7 @@ index 9a41040..3413c7c 100644
  COPY --link --from=containerd /out/containerd* /usr/bin/
  COPY --link --from=cni-plugins /opt/cni/bin/bridge /opt/cni/bin/host-local /opt/cni/bin/loopback /opt/cni/bin/firewall /opt/cni/bin/dnsname /opt/cni/bin/
  COPY --link hack/fixtures/cni.json /etc/buildkit/cni.json
-@@ -262,13 +290,30 @@ FROM integration-tests AS dev-env
+@@ -274,13 +290,30 @@ FROM integration-tests AS dev-env
  VOLUME /var/lib/buildkit
  
  # Rootless mode.
@@ -767,6 +834,22 @@ index 813fcdf..70ab905 100644
  
  install: FORCE
  	mkdir -p $(DESTDIR)$(bindir)
+diff --git upstream/v0.11/README.md origin/v0.11/README.md
+index 7ead5fb..c295a09 100644
+--- upstream/v0.11/README.md
++++ origin/v0.11/README.md
+@@ -542,11 +542,6 @@ There are 2 options supported for Azure Blob Storage authentication:
+ * Any system using environment variables supported by the [Azure SDK for Go](https://docs.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication). The configuration must be available for the buildkit daemon, not for the client.
+ * Secret Access Key, using the `secret_access_key` attribute to specify the primary or secondary account key for your Azure Blob Storage account. [Azure Blob Storage account keys](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
+ 
+-> **Note**
+->
+-> Account name can also be specified with `account_name` attribute (or `$BUILDKIT_AZURE_STORAGE_ACCOUNT_NAME`)
+-> if it is not part of the account URL host.
+-
+ `--export-cache` options:
+ * `type=azblob`
+ * `mode=<min|max>`: specify cache layers to export (default: `min`)
 diff --git upstream/v0.11/cache/manager_test.go origin/v0.11/cache/manager_test.go
 index 5c71246..cd58a40 100644
 --- upstream/v0.11/cache/manager_test.go
@@ -821,6 +904,36 @@ index 0af736a..dc2cd56 100644
  		if err := mount.All(mounts, dir); err != nil {
  			return nil, nil, err
  		}
+diff --git upstream/v0.11/cache/remotecache/azblob/utils.go origin/v0.11/cache/remotecache/azblob/utils.go
+index 5fa87d2..a993b4a 100644
+--- upstream/v0.11/cache/remotecache/azblob/utils.go
++++ origin/v0.11/cache/remotecache/azblob/utils.go
+@@ -15,7 +15,6 @@ import (
+ 
+ const (
+ 	attrSecretAccessKey = "secret_access_key"
+-	attrAccountName     = "account_name"
+ 	attrAccountURL      = "account_url"
+ 	attrPrefix          = "prefix"
+ 	attrManifestsPrefix = "manifests_prefix"
+@@ -51,16 +50,7 @@ func getConfig(attrs map[string]string) (*Config, error) {
+ 		return &Config{}, errors.Wrap(err, "azure storage account url provided is not a valid url")
+ 	}
+ 
+-	accountName, ok := attrs[attrAccountName]
+-	if !ok {
+-		accountName, ok = os.LookupEnv("BUILDKIT_AZURE_STORAGE_ACCOUNT_NAME")
+-		if !ok {
+-			accountName = strings.Split(accountURL.Hostname(), ".")[0]
+-		}
+-	}
+-	if accountName == "" {
+-		return &Config{}, errors.New("unable to retrieve account name from account url or ${BUILDKIT_AZURE_STORAGE_ACCOUNT_NAME} or account_name attribute for azblob cache")
+-	}
++	accountName := strings.Split(accountURL.Hostname(), ".")[0]
+ 
+ 	container, ok := attrs[attrContainer]
+ 	if !ok {
 diff --git upstream/v0.11/canonical_utils/artifactory/fetch_from_artifactory.py origin/v0.11/canonical_utils/artifactory/fetch_from_artifactory.py
 new file mode 100755
 index 0000000..d2a2706
@@ -985,10 +1098,19 @@ index a6bc37a..1376c15 100644
  	c, err := New(sb.Context(), sb.Address())
  	require.NoError(t, err)
 diff --git upstream/v0.11/client/client_test.go origin/v0.11/client/client_test.go
-index 348d810..b97eb75 100644
+index 8c2245c..b97eb75 100644
 --- upstream/v0.11/client/client_test.go
 +++ origin/v0.11/client/client_test.go
-@@ -195,7 +195,6 @@ func TestIntegration(t *testing.T) {
+@@ -112,8 +112,6 @@ func TestIntegration(t *testing.T) {
+ 		testReadonlyRootFS,
+ 		testBasicRegistryCacheImportExport,
+ 		testBasicLocalCacheImportExport,
+-		testBasicS3CacheImportExport,
+-		testBasicAzblobCacheImportExport,
+ 		testCachedMounts,
+ 		testCopyFromEmptyImage,
+ 		testProxyEnv,
+@@ -197,7 +195,6 @@ func TestIntegration(t *testing.T) {
  		testMountStubsDirectory,
  		testMountStubsTimestamp,
  		testSourcePolicy,
@@ -996,7 +1118,7 @@ index 348d810..b97eb75 100644
  	)
  }
  
-@@ -247,7 +246,7 @@ func newContainerd(cdAddress string) (*containerd.Client, error) {
+@@ -249,7 +246,7 @@ func newContainerd(cdAddress string) (*containerd.Client, error) {
  
  // moby/buildkit#1336
  func testCacheExportCacheKeyLoop(t *testing.T, sb integration.Sandbox) {
@@ -1005,7 +1127,7 @@ index 348d810..b97eb75 100644
  	c, err := New(sb.Context(), sb.Address())
  	require.NoError(t, err)
  	defer c.Close()
-@@ -976,6 +975,7 @@ func testSecurityModeErrors(t *testing.T, sb integration.Sandbox) {
+@@ -978,6 +975,7 @@ func testSecurityModeErrors(t *testing.T, sb integration.Sandbox) {
  }
  
  func testFrontendImageNaming(t *testing.T, sb integration.Sandbox) {
@@ -1013,7 +1135,7 @@ index 348d810..b97eb75 100644
  	requiresLinux(t)
  	c, err := New(sb.Context(), sb.Address())
  	require.NoError(t, err)
-@@ -1084,15 +1084,12 @@ func testFrontendImageNaming(t *testing.T, sb integration.Sandbox) {
+@@ -1086,15 +1084,12 @@ func testFrontendImageNaming(t *testing.T, sb integration.Sandbox) {
  
  					switch exp {
  					case ExporterOCI:
@@ -1029,7 +1151,7 @@ index 348d810..b97eb75 100644
  						imageName = registry + "/" + imageName
  						so.Exports[0].Attrs["push"] = "true"
  					}
-@@ -3751,11 +3748,7 @@ func testBuildPushAndValidate(t *testing.T, sb integration.Sandbox) {
+@@ -3753,11 +3748,7 @@ func testBuildPushAndValidate(t *testing.T, sb integration.Sandbox) {
  }
  
  func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -1042,7 +1164,7 @@ index 348d810..b97eb75 100644
  	requiresLinux(t)
  	cdAddress := sb.ContainerdAddress()
  	if cdAddress == "" || sb.Snapshotter() != "stargz" {
-@@ -3815,7 +3808,6 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
+@@ -3817,7 +3808,6 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
  
  	// clear all local state out
  	ensurePruneAll(t, c, sb)
@@ -1050,7 +1172,7 @@ index 348d810..b97eb75 100644
  
  	// stargz layers should be lazy even for executing something on them
  	def, err = baseDef.
-@@ -3903,12 +3895,7 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
+@@ -3905,12 +3895,7 @@ func testStargzLazyRegistryCacheImportExport(t *testing.T, sb integration.Sandbo
  }
  
  func testStargzLazyInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -1064,7 +1186,7 @@ index 348d810..b97eb75 100644
  	requiresLinux(t)
  	cdAddress := sb.ContainerdAddress()
  	if cdAddress == "" || sb.Snapshotter() != "stargz" {
-@@ -4323,7 +4310,7 @@ func testLazyImagePush(t *testing.T, sb integration.Sandbox) {
+@@ -4325,7 +4310,7 @@ func testLazyImagePush(t *testing.T, sb integration.Sandbox) {
  }
  
  func testZstdLocalCacheExport(t *testing.T, sb integration.Sandbox) {
@@ -1073,7 +1195,7 @@ index 348d810..b97eb75 100644
  	c, err := New(sb.Context(), sb.Address())
  	require.NoError(t, err)
  	defer c.Close()
-@@ -4465,21 +4452,12 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
+@@ -4467,21 +4452,12 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
  	for _, ignoreError := range ignoreErrorValues {
  		ignoreErrStr := strconv.FormatBool(ignoreError)
  		for n, test := range tests {
@@ -1095,7 +1217,7 @@ index 348d810..b97eb75 100644
  				_, err = c.Solve(sb.Context(), def, SolveOpt{
  					Exports:      test.Exports,
  					CacheExports: test.CacheExports,
-@@ -4498,11 +4476,7 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
+@@ -4500,11 +4476,7 @@ func testCacheExportIgnoreError(t *testing.T, sb integration.Sandbox) {
  }
  
  func testUncompressedLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -1108,7 +1230,7 @@ index 348d810..b97eb75 100644
  	dir := t.TempDir()
  	im := CacheOptionsEntry{
  		Type: "local",
-@@ -4522,11 +4496,7 @@ func testUncompressedLocalCacheImportExport(t *testing.T, sb integration.Sandbox
+@@ -4524,11 +4496,7 @@ func testUncompressedLocalCacheImportExport(t *testing.T, sb integration.Sandbox
  }
  
  func testUncompressedRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -1121,7 +1243,7 @@ index 348d810..b97eb75 100644
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
  		t.Skip(err.Error())
-@@ -4551,11 +4521,7 @@ func testUncompressedRegistryCacheImportExport(t *testing.T, sb integration.Sand
+@@ -4553,11 +4521,7 @@ func testUncompressedRegistryCacheImportExport(t *testing.T, sb integration.Sand
  }
  
  func testZstdLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -1134,7 +1256,7 @@ index 348d810..b97eb75 100644
  	dir := t.TempDir()
  	im := CacheOptionsEntry{
  		Type: "local",
-@@ -4576,11 +4542,7 @@ func testZstdLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4578,11 +4542,7 @@ func testZstdLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
  }
  
  func testZstdRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -1147,7 +1269,7 @@ index 348d810..b97eb75 100644
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
  		t.Skip(err.Error())
-@@ -4668,11 +4630,7 @@ func testBasicCacheImportExport(t *testing.T, sb integration.Sandbox, cacheOptio
+@@ -4670,11 +4630,7 @@ func testBasicCacheImportExport(t *testing.T, sb integration.Sandbox, cacheOptio
  }
  
  func testBasicRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -1160,7 +1282,7 @@ index 348d810..b97eb75 100644
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
  		t.Skip(err.Error())
-@@ -4689,11 +4647,7 @@ func testBasicRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4691,11 +4647,7 @@ func testBasicRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
  }
  
  func testMultipleRegistryCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -1173,7 +1295,7 @@ index 348d810..b97eb75 100644
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
  		t.Skip(err.Error())
-@@ -4716,11 +4670,7 @@ func testMultipleRegistryCacheImportExport(t *testing.T, sb integration.Sandbox)
+@@ -4718,11 +4670,7 @@ func testMultipleRegistryCacheImportExport(t *testing.T, sb integration.Sandbox)
  }
  
  func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
@@ -1186,9 +1308,81 @@ index 348d810..b97eb75 100644
  	dir := t.TempDir()
  	im := CacheOptionsEntry{
  		Type: "local",
-@@ -4738,11 +4688,7 @@ func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4739,83 +4687,8 @@ func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+ 	testBasicCacheImportExport(t, sb, []CacheOptionsEntry{im}, []CacheOptionsEntry{ex})
  }
  
+-func testBasicS3CacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+-
+-	opts := integration.MinioOpts{
+-		Region:          "us-east-1",
+-		AccessKeyID:     "minioadmin",
+-		SecretAccessKey: "minioadmin",
+-	}
+-
+-	s3Addr, s3Bucket, cleanup, err := integration.NewMinioServer(t, sb, opts)
+-	require.NoError(t, err)
+-	defer cleanup()
+-
+-	im := CacheOptionsEntry{
+-		Type: "s3",
+-		Attrs: map[string]string{
+-			"region":            opts.Region,
+-			"access_key_id":     opts.AccessKeyID,
+-			"secret_access_key": opts.SecretAccessKey,
+-			"bucket":            s3Bucket,
+-			"endpoint_url":      s3Addr,
+-			"use_path_style":    "true",
+-		},
+-	}
+-	ex := CacheOptionsEntry{
+-		Type: "s3",
+-		Attrs: map[string]string{
+-			"region":            opts.Region,
+-			"access_key_id":     opts.AccessKeyID,
+-			"secret_access_key": opts.SecretAccessKey,
+-			"bucket":            s3Bucket,
+-			"endpoint_url":      s3Addr,
+-			"use_path_style":    "true",
+-		},
+-	}
+-	testBasicCacheImportExport(t, sb, []CacheOptionsEntry{im}, []CacheOptionsEntry{ex})
+-}
+-
+-func testBasicAzblobCacheImportExport(t *testing.T, sb integration.Sandbox) {
+-	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+-
+-	opts := integration.AzuriteOpts{
+-		AccountName: "azblobcacheaccount",
+-		AccountKey:  base64.StdEncoding.EncodeToString([]byte("azblobcacheaccountkey")),
+-	}
+-
+-	azAddr, cleanup, err := integration.NewAzuriteServer(t, sb, opts)
+-	require.NoError(t, err)
+-	defer cleanup()
+-
+-	im := CacheOptionsEntry{
+-		Type: "azblob",
+-		Attrs: map[string]string{
+-			"account_url":       azAddr,
+-			"account_name":      opts.AccountName,
+-			"secret_access_key": opts.AccountKey,
+-			"container":         "cachecontainer",
+-		},
+-	}
+-	ex := CacheOptionsEntry{
+-		Type: "azblob",
+-		Attrs: map[string]string{
+-			"account_url":       azAddr,
+-			"account_name":      opts.AccountName,
+-			"secret_access_key": opts.AccountKey,
+-			"container":         "cachecontainer",
+-		},
+-	}
+-	testBasicCacheImportExport(t, sb, []CacheOptionsEntry{im}, []CacheOptionsEntry{ex})
+-}
+-
  func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
 -	integration.CheckFeatureCompat(t, sb,
 -		integration.FeatureDirectPush,
@@ -1199,7 +1393,7 @@ index 348d810..b97eb75 100644
  	requiresLinux(t)
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
-@@ -4794,7 +4740,6 @@ func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4867,7 +4740,6 @@ func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
  	require.NoError(t, err)
  
  	ensurePruneAll(t, c, sb)
@@ -1207,7 +1401,7 @@ index 348d810..b97eb75 100644
  
  	resp, err = c.Solve(sb.Context(), def, SolveOpt{
  		// specifying inline cache exporter is needed for reproducing containerimage.digest
-@@ -5669,7 +5614,6 @@ func testProxyEnv(t *testing.T, sb integration.Sandbox) {
+@@ -5742,7 +5614,6 @@ func testProxyEnv(t *testing.T, sb integration.Sandbox) {
  }
  
  func testMergeOp(t *testing.T, sb integration.Sandbox) {
@@ -1215,7 +1409,7 @@ index 348d810..b97eb75 100644
  	requiresLinux(t)
  
  	c, err := New(sb.Context(), sb.Address())
-@@ -5782,7 +5726,7 @@ func testMergeOpCacheMax(t *testing.T, sb integration.Sandbox) {
+@@ -5855,7 +5726,7 @@ func testMergeOpCacheMax(t *testing.T, sb integration.Sandbox) {
  
  func testMergeOpCache(t *testing.T, sb integration.Sandbox, mode string) {
  	t.Helper()
@@ -1224,7 +1418,7 @@ index 348d810..b97eb75 100644
  	requiresLinux(t)
  
  	cdAddress := sb.ContainerdAddress()
-@@ -8946,31 +8890,3 @@ func testSourcePolicy(t *testing.T, sb integration.Sandbox) {
+@@ -9019,31 +8890,3 @@ func testSourcePolicy(t *testing.T, sb integration.Sandbox) {
  		require.ErrorContains(t, err, sourcepolicy.ErrSourceDenied.Error())
  	})
  }
@@ -1438,7 +1632,7 @@ index 5c3bdee..36b27aa 100644
  	img.Config.WorkingDir = "/"
  	img.Config.Env = []string{"PATH=" + system.DefaultPathEnv(platform.OS)}
 diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
-index bb911e2..82f829c 100644
+index 2914f7c..82f829c 100644
 --- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
 +++ origin/v0.11/frontend/dockerfile/dockerfile_test.go
 @@ -419,7 +419,7 @@ RUN [ "$(cat testfile)" == "contents0" ]
@@ -1480,7 +1674,7 @@ index bb911e2..82f829c 100644
 -	// note that this digest differs from the one in master, due to
 -	// commit a89f482dcb3428c0297f39474eebd7de15e4792a not being included
 -	// in this branch.
--	const expectedDigest = "sha256:e26093cc8a7524089a1d0136457e6c09a34176e2b2efcf99ac471baa729c7dc9"
+-	const expectedDigest = "sha256:aa2d0a0f9a6560c267b0c2d41c758ca60386d6001cd687adf837365236507a0a"
 +	const expectedDigest = "sha256:0ae0bfad915535a615d42aa5313d15ed65902ea1744d7adc7fe4497dea8b33e3"
  
  	dir, err := integration.Tmpdir(
@@ -1504,7 +1698,7 @@ index 252617f..1b000a8 100644
  
  			if file := msg.GetFile(); file != nil {
 diff --git upstream/v0.11/go.mod origin/v0.11/go.mod
-index b766ca6..d2c1cec 100644
+index 710d0f3..d2c1cec 100644
 --- upstream/v0.11/go.mod
 +++ origin/v0.11/go.mod
 @@ -6,7 +6,7 @@ require (
@@ -1520,7 +1714,7 @@ index b766ca6..d2c1cec 100644
  	github.com/aws/aws-sdk-go-v2/service/s3 v1.26.9
  	github.com/aws/smithy-go v1.11.2
  	github.com/containerd/console v1.0.3
--	github.com/containerd/containerd v1.6.20
+-	github.com/containerd/containerd v1.6.21
 +	github.com/containerd/containerd v1.6.18
  	github.com/containerd/continuity v0.3.0
  	github.com/containerd/fuse-overlayfs-snapshotter v1.0.2
@@ -1546,7 +1740,7 @@ index b766ca6..d2c1cec 100644
  	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
  	github.com/davecgh/go-spew v1.1.1 // indirect
 diff --git upstream/v0.11/go.sum origin/v0.11/go.sum
-index ac08571..9cb25f9 100644
+index 684d5c4..9cb25f9 100644
 --- upstream/v0.11/go.sum
 +++ origin/v0.11/go.sum
 @@ -167,8 +167,8 @@ github.com/Microsoft/hcsshim v0.8.21/go.mod h1:+w2gRZ5ReXQhFOrvSQeNfhrYB/dg3oDwT
@@ -1564,8 +1758,8 @@ index ac08571..9cb25f9 100644
  github.com/containerd/containerd v1.5.8/go.mod h1:YdFSv5bTFLpG2HIYmfqDpSYYTDX+mc5qtSuYx1YUb/s=
  github.com/containerd/containerd v1.6.1/go.mod h1:1nJz5xCZPusx6jJU8Frfct988y0NpumIq9ODB0kLtoE=
  github.com/containerd/containerd v1.6.9/go.mod h1:XVicUvkxOrftE2Q1YWUXgZwkkAxwQYNOFzYWvfVfEfQ=
--github.com/containerd/containerd v1.6.20 h1:+itjwpdqXpzHB/QAiWc/BZCjjVfcNgw69w/oIeF4Oy0=
--github.com/containerd/containerd v1.6.20/go.mod h1:apei1/i5Ux2FzrK6+DM/suEsGuK/MeVOfy8tR2q7Wnw=
+-github.com/containerd/containerd v1.6.21 h1:eSTAmnvDKRPWan+MpSSfNyrtleXd86ogK9X8fMWpe/Q=
+-github.com/containerd/containerd v1.6.21/go.mod h1:apei1/i5Ux2FzrK6+DM/suEsGuK/MeVOfy8tR2q7Wnw=
 +github.com/containerd/containerd v1.6.18 h1:qZbsLvmyu+Vlty0/Ex5xc0z2YtKpIsb5n45mAMI+2Ns=
 +github.com/containerd/containerd v1.6.18/go.mod h1:1RdCUu95+gc2v9t3IL+zIlpClSmew7/0YS8O5eQZrOw=
  github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
@@ -1620,36 +1814,246 @@ index ac08571..9cb25f9 100644
  github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8/go.mod h1:HUYIGzjTL3rfEspMxjDjgmT5uz5wzYJKVo23qUhYTos=
  github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
  github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
+diff --git upstream/v0.11/hack/azblob_test/Dockerfile origin/v0.11/hack/azblob_test/Dockerfile
+new file mode 100644
+index 0000000..37d5d2d
+--- /dev/null
++++ origin/v0.11/hack/azblob_test/Dockerfile
+@@ -0,0 +1,16 @@
++FROM moby/buildkit AS buildkit
++
++FROM debian:bullseye-slim
++RUN apt-get update \
++  && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
++  && apt-get install -y --no-install-recommends ca-certificates containerd curl nodejs npm procps \
++  && apt-get clean \
++  && rm -rf /var/lib/apt/lists/* \
++  && npm install -g azurite@3.18.0 \
++  && mkdir /test \
++  && mkdir /tmp/azurite \
++  && curl -sL https://aka.ms/InstallAzureCLIDeb | bash
++
++COPY --link --from=buildkit /usr/bin/buildkitd /usr/bin/buildctl /bin/
++
++COPY --link . /test
 diff --git upstream/v0.11/hack/azblob_test/docker-bake.hcl origin/v0.11/hack/azblob_test/docker-bake.hcl
-index fc57c4a..a0997f8 100644
---- upstream/v0.11/hack/azblob_test/docker-bake.hcl
+new file mode 100644
+index 0000000..a0997f8
+--- /dev/null
 +++ origin/v0.11/hack/azblob_test/docker-bake.hcl
-@@ -1,6 +1,10 @@
- target "buildkit" {
-   context = "../../"
-   cache-from = ["type=gha,scope=binaries"]
+@@ -0,0 +1,15 @@
++target "buildkit" {
++  context = "../../"
++  cache-from = ["type=gha,scope=binaries"]
 +  secret = [
 +    "id=ARTIFACTORY_APT_AUTH_CONF",
 +    "id=ARTIFACTORY_BASE64_GPG"
 +  ]
- }
- 
- target "default" {
++}
++
++target "default" {
++  contexts = {
++    buildkit = "target:buildkit"
++  }
++  tags = ["moby/buildkit:azblobtest"]
++}
 diff --git upstream/v0.11/hack/azblob_test/run_test.sh origin/v0.11/hack/azblob_test/run_test.sh
-index cdf0dc2..cfcae8b 100755
---- upstream/v0.11/hack/azblob_test/run_test.sh
+new file mode 100755
+index 0000000..cfcae8b
+--- /dev/null
 +++ origin/v0.11/hack/azblob_test/run_test.sh
-@@ -7,7 +7,9 @@ function cleanup() {
- trap cleanup EXIT
- cd "$(dirname "$0")"
- 
--docker buildx bake --load
+@@ -0,0 +1,26 @@
++#!/bin/bash -ex
++
++function cleanup() {
++  docker rmi moby/buildkit:azblobtest
++}
++
++trap cleanup EXIT
++cd "$(dirname "$0")"
++
 +docker buildx bake --load \
 +  --set buildkit.secrets=id=ARTIFACTORY_APT_AUTH_CONF \
 +  --set buildkit.secrets=id=ARTIFACTORY_BASE64_GPG
- 
- AZURE_ACCOUNT_NAME=azblobcacheaccount
- AZURE_ACCOUNT_URL=azblobcacheaccount.blob.localhost.com
++
++AZURE_ACCOUNT_NAME=azblobcacheaccount
++AZURE_ACCOUNT_URL=azblobcacheaccount.blob.localhost.com
++AZURE_ACCOUNT_KEY=$(echo "azblobcacheaccountkey" | base64)
++
++docker run \
++  --rm \
++  --privileged \
++  --add-host ${AZURE_ACCOUNT_URL}:127.0.0.1 \
++  -e AZURE_ACCOUNT_NAME=${AZURE_ACCOUNT_NAME} \
++  -e AZURE_ACCOUNT_KEY=${AZURE_ACCOUNT_KEY} \
++  -e AZURE_ACCOUNT_URL=${AZURE_ACCOUNT_URL} \
++  moby/buildkit:azblobtest \
++  /test/test.sh
+diff --git upstream/v0.11/hack/azblob_test/test.sh origin/v0.11/hack/azblob_test/test.sh
+new file mode 100755
+index 0000000..adffaf0
+--- /dev/null
++++ origin/v0.11/hack/azblob_test/test.sh
+@@ -0,0 +1,131 @@
++#!/bin/bash -ex
++
++# Refer to https://docs.microsoft.com/en-us/azure/storage/common/storage-use-azurite Azurite documentation
++rm -rf /tmp/azurite
++
++export AZURITE_ACCOUNTS="${AZURE_ACCOUNT_NAME}:${AZURE_ACCOUNT_KEY}"
++BLOB_PORT=10000
++
++azurite --silent --location /tmp/azurite --debug /tmp/azurite/azurite.debug --blobPort ${BLOB_PORT} &
++timeout 15 bash -c "until echo > /dev/tcp/localhost/${BLOB_PORT}; do sleep 0.5; done"
++
++buildkitd -debugaddr 0.0.0.0:8060 &
++while true; do
++  curl -s -f http://127.0.0.1:8060/debug/pprof/ >/dev/null && break
++  sleep 1
++done
++
++export default_options="type=azblob,container=cachecontainer,account_url=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT},secret_access_key=${AZURE_ACCOUNT_KEY}"
++
++rm -rf /tmp/destdir1 /tmp/destdir2
++
++# First build of test1: no cache
++buildctl build \
++  --progress plain \
++  --frontend dockerfile.v0 \
++  --local context=/test/test1 \
++  --local dockerfile=/test/test1 \
++  --import-cache "$default_options,name=foo" \
++  --export-cache "$default_options,mode=max,name=bar;foo" \
++  --output type=local,dest=/tmp/destdir1
++
++# Check the 4 blob files and 2 manifest files in the azure blob container
++blobCount=$(az storage blob list --output tsv --prefix blobs --container-name cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};" | wc -l)
++if (("$blobCount" != 4)); then
++  echo "unexpected number of blobs found: $blobCount"
++  exit 1
++fi
++
++manifestCount=$(az storage blob list --output tsv --prefix manifests --container-name cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};" | wc -l)
++if (("$manifestCount" != 2)); then
++  echo "unexpected number of manifests found: $manifestCount"
++  exit 1
++fi
++
++mkdir /tmp/content1
++az storage blob download-batch -d /tmp/content1 --pattern blobs/* -s cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};"
++
++# Second build of test1: Test that cache was used
++buildctl build \
++  --progress plain \
++  --frontend dockerfile.v0 \
++  --local context=/test/test1 \
++  --local dockerfile=/test/test1 \
++  --import-cache "$default_options,name=foo" \
++  --export-cache "$default_options,mode=max,name=bar;foo" \
++  2>&1 | tee /tmp/log1
++
++# Check that the existing steps were read from the cache
++cat /tmp/log1 | grep 'cat /dev/urandom | head -c 100 | sha256sum > unique_first' -A1 | grep CACHED
++cat /tmp/log1 | grep 'cat /dev/urandom | head -c 100 | sha256sum > unique_second' -A1 | grep CACHED
++
++# No change expected in the blobs
++mkdir /tmp/content2
++az storage blob download-batch -d /tmp/content2 --pattern blobs/* -s cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};"
++diff -r /tmp/content1 /tmp/content2
++
++# First build of test2: Test that we can reuse the cache for a different docker image
++buildctl prune
++buildctl build \
++  --progress plain \
++  --frontend dockerfile.v0 \
++  --local context=/test/test2 \
++  --local dockerfile=/test/test2 \
++  --import-cache "$default_options,name=foo" \
++  --export-cache "$default_options,mode=max,name=bar;foo" \
++  --output type=local,dest=/tmp/destdir2 \
++  2>&1 | tee /tmp/log2
++
++mkdir /tmp/content3
++az storage blob download-batch -d /tmp/content3 --pattern blobs/* -s cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};"
++
++# There should ONLY be 1 difference between the contents of /tmp/content1 and /tmp/content3
++# This difference is that in /tmp/content3 there should 1 extra blob corresponding to the layer: RUN cat /dev/urandom | head -c 100 | sha256sum > unique_third
++contentDiff=$(diff -r /tmp/content1 /tmp/content3 || :)
++if [[ ! "$contentDiff" =~ ^"Only in /tmp/content3/blobs: sha256:"[a-z0-9]{64}$ ]]; then
++  echo "unexpected diff found $contentDiff"
++  exit 1
++fi
++
++# Check the existing steps were not executed, but read from cache
++cat /tmp/log2 | grep 'cat /dev/urandom | head -c 100 | sha256sum > unique_first' -A1 | grep CACHED
++
++# Ensure cache is reused
++rm /tmp/destdir2/unique_third
++diff -r /tmp/destdir1 /tmp/destdir2
++
++# Second build of test2: Test the behavior when a blob is missing
++az storage blob delete-batch -s cachecontainer --pattern blobs/* --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};"
++
++buildctl prune
++buildctl build \
++  --progress plain \
++  --frontend dockerfile.v0 \
++  --local context=/test/test2 \
++  --local dockerfile=/test/test2 \
++  --import-cache "$default_options,name=foo" \
++  2>&1 | tee /tmp/log3
++
++cat /tmp/log3 | grep -E 'blob.+not found' >/dev/null
++
++pids=""
++
++for i in $(seq 0 9); do
++  buildctl build \
++    --progress plain \
++    --frontend dockerfile.v0 \
++    --local context=/test/test1 \
++    --local dockerfile=/test/test1 \
++    --import-cache "$default_options,name=foo" \
++    --export-cache "$default_options,mode=max,name=bar;foo" \
++    &>/tmp/concurrencytestlog$i &
++  pids="$pids $!"
++done
++
++wait $pids
++
++for i in $(seq 0 9); do
++  cat /tmp/concurrencytestlog$i | grep -q -v 'failed to upload blob '
++done
++
++echo Azure blob checks ok
+diff --git upstream/v0.11/hack/azblob_test/test1/Dockerfile origin/v0.11/hack/azblob_test/test1/Dockerfile
+new file mode 100644
+index 0000000..d56dd9d
+--- /dev/null
++++ origin/v0.11/hack/azblob_test/test1/Dockerfile
+@@ -0,0 +1,7 @@
++FROM busybox:1.35 AS build
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_first
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_second
++
++FROM scratch
++COPY --link --from=build /unique_first /
++COPY --link --from=build /unique_second /
+diff --git upstream/v0.11/hack/azblob_test/test2/Dockerfile origin/v0.11/hack/azblob_test/test2/Dockerfile
+new file mode 100644
+index 0000000..c0efe23
+--- /dev/null
++++ origin/v0.11/hack/azblob_test/test2/Dockerfile
+@@ -0,0 +1,9 @@
++FROM busybox:1.35 AS build
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_first
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_second
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_third
++
++FROM scratch
++COPY --link --from=build /unique_first /
++COPY --link --from=build /unique_second /
++COPY --link --from=build /unique_third /
 diff --git upstream/v0.11/hack/canonical_test/Dockerfile origin/v0.11/hack/canonical_test/Dockerfile
 new file mode 100644
 index 0000000..8fe9186
@@ -1797,32 +2201,200 @@ index d1315e6..6886026 100755
 -  $currentcontext
 +buildxCmd build $platformFlag $targetFlag $secrets $importCacheFlags $exportCacheFlags $tagFlags $outputFlag $nocacheFilterFlag $attestFlags \
 +  $currentcontext --progress plain
+diff --git upstream/v0.11/hack/s3_test/Dockerfile origin/v0.11/hack/s3_test/Dockerfile
+new file mode 100644
+index 0000000..c20c8ff
+--- /dev/null
++++ origin/v0.11/hack/s3_test/Dockerfile
+@@ -0,0 +1,21 @@
++ARG MINIO_VERSION=RELEASE.2022-05-03T20-36-08Z
++ARG MINIO_MC_VERSION=RELEASE.2022-05-04T06-07-55Z
++
++FROM minio/minio:${MINIO_VERSION} AS minio
++FROM minio/mc:${MINIO_MC_VERSION} AS minio-mc
++FROM moby/buildkit AS buildkit
++
++FROM debian:bullseye-slim
++
++RUN apt-get update \
++  && apt-get install -y --no-install-recommends wget ca-certificates containerd curl \
++  && apt-get clean \
++  && rm -rf /var/lib/apt/lists/*
++
++RUN mkdir /test
++
++COPY --from=buildkit /usr/bin/buildkitd /usr/bin/buildctl /bin
++COPY --from=minio /opt/bin/minio /bin
++COPY --from=minio-mc /usr/bin/mc /bin
++
++COPY . /test
 diff --git upstream/v0.11/hack/s3_test/docker-bake.hcl origin/v0.11/hack/s3_test/docker-bake.hcl
-index 351e84b..e9f7cdd 100644
---- upstream/v0.11/hack/s3_test/docker-bake.hcl
+new file mode 100644
+index 0000000..e9f7cdd
+--- /dev/null
 +++ origin/v0.11/hack/s3_test/docker-bake.hcl
-@@ -1,6 +1,10 @@
- target "buildkit" {
-   context = "../../"
-   cache-from = ["type=gha,scope=binaries"]
+@@ -0,0 +1,15 @@
++target "buildkit" {
++  context = "../../"
++  cache-from = ["type=gha,scope=binaries"]
 +  secret = [
 +    "id=ARTIFACTORY_APT_AUTH_CONF",
 +    "id=ARTIFACTORY_BASE64_GPG"
 +  ]
- }
- 
- target "default" {
-diff --git upstream/v0.11/hack/s3_test/run_test.sh origin/v0.11/hack/s3_test/run_test.sh
-index a2b2d4d..afa3ce1 100755
---- upstream/v0.11/hack/s3_test/run_test.sh
-+++ origin/v0.11/hack/s3_test/run_test.sh
-@@ -3,5 +3,6 @@
- cd "$(dirname "$0")"
- 
- docker buildx bake --load
++}
 +
- docker run --rm --privileged -p 9001:9001 -p 8060:8060 moby/buildkit:s3test /test/test.sh
- docker rmi moby/buildkit:s3test
++target "default" {
++  contexts = {
++    buildkit = "target:buildkit"
++  }
++  tags = ["moby/buildkit:s3test"]
++}
+diff --git upstream/v0.11/hack/s3_test/run_test.sh origin/v0.11/hack/s3_test/run_test.sh
+new file mode 100755
+index 0000000..afa3ce1
+--- /dev/null
++++ origin/v0.11/hack/s3_test/run_test.sh
+@@ -0,0 +1,8 @@
++#!/bin/sh -ex
++
++cd "$(dirname "$0")"
++
++docker buildx bake --load
++
++docker run --rm --privileged -p 9001:9001 -p 8060:8060 moby/buildkit:s3test /test/test.sh
++docker rmi moby/buildkit:s3test
+diff --git upstream/v0.11/hack/s3_test/test.sh origin/v0.11/hack/s3_test/test.sh
+new file mode 100755
+index 0000000..d9918bd
+--- /dev/null
++++ origin/v0.11/hack/s3_test/test.sh
+@@ -0,0 +1,98 @@
++#!/bin/sh -ex
++
++/bin/minio server /tmp/data --address=0.0.0.0:9000 --console-address=0.0.0.0:9001 &
++
++while true; do
++  curl -s -f http://127.0.0.1:9001 >/dev/null && break
++  sleep 1
++done
++
++sleep 2
++mc alias set myminio http://127.0.0.1:9000 minioadmin minioadmin
++mc mb myminio/my-bucket
++mc admin trace myminio &
++
++buildkitd -debugaddr 0.0.0.0:8060 &
++while true; do
++  curl -s -f http://127.0.0.1:8060/debug/pprof/ >/dev/null && break
++  sleep 1
++done
++
++export default_options="type=s3,bucket=my-bucket,region=us-east-1,endpoint_url=http://127.0.0.1:9000,access_key_id=minioadmin,secret_access_key=minioadmin,use_path_style=true"
++
++rm -rf /tmp/destdir1 /tmp/destdir2
++
++# First build: no cache on s3
++# 4 files should be exported (2 blobs + 2 manifests)
++buildctl build \
++  --progress plain \
++  --frontend dockerfile.v0 \
++  --local context=/test/test1 \
++  --local dockerfile=/test/test1 \
++  --import-cache "$default_options,name=foo" \
++  --export-cache "$default_options,mode=max,name=bar;foo" \
++  --output type=local,dest=/tmp/destdir1
++
++# Check the 5 files are on s3 (3 blobs and 2 manifests)
++mc ls --recursive myminio/my-bucket | wc -l | grep 5
++
++# Test the refresh workflow
++mc ls --recursive myminio/my-bucket/blobs >/tmp/content
++buildctl build \
++  --progress plain \
++  --frontend dockerfile.v0 \
++  --local context=/test/test1 \
++  --local dockerfile=/test/test1 \
++  --import-cache "$default_options,name=foo" \
++  --export-cache "$default_options,mode=max,name=bar;foo"
++mc ls --recursive myminio/my-bucket/blobs >/tmp/content2
++# No change expected
++diff /tmp/content /tmp/content2
++
++sleep 2
++
++buildctl build \
++  --progress plain \
++  --frontend dockerfile.v0 \
++  --local context=/test/test1 \
++  --local dockerfile=/test/test1 \
++  --import-cache "$default_options,name=foo" \
++  --export-cache "$default_options,mode=max,name=bar;foo,touch_refresh=1s"
++mc ls --recursive myminio/my-bucket/blobs >/tmp/content2
++# Touch refresh = 1 should have caused a change in timestamp
++if diff /tmp/content /tmp/content2; then
++  exit 1
++fi
++
++# Check we can reuse the cache
++buildctl prune
++buildctl build \
++  --progress plain \
++  --frontend dockerfile.v0 \
++  --local context=/test/test2 \
++  --local dockerfile=/test/test2 \
++  --import-cache "$default_options,name=foo" \
++  --output type=local,dest=/tmp/destdir2 \
++  2>&1 | tee /tmp/log
++
++# Check the first step was not executed, but read from S3 cache
++cat /tmp/log | grep 'cat /dev/urandom | head -c 100 | sha256sum > unique_first' -A1 | grep CACHED
++
++# Ensure cache is reused
++rm /tmp/destdir2/unique_third
++diff -r /tmp/destdir1 /tmp/destdir2
++
++# Test the behavior when a blob is missing
++mc rm --force --recursive myminio/my-bucket/blobs
++
++buildctl prune
++buildctl build \
++  --progress plain \
++  --frontend dockerfile.v0 \
++  --local context=/test/test2 \
++  --local dockerfile=/test/test2 \
++  --import-cache "$default_options,name=foo" \
++  >/tmp/log 2>&1 || true
++cat /tmp/log | grep 'NoSuchKey' >/dev/null
++
++echo S3 Checks ok
+diff --git upstream/v0.11/hack/s3_test/test1/Dockerfile origin/v0.11/hack/s3_test/test1/Dockerfile
+new file mode 100644
+index 0000000..8338f8e
+--- /dev/null
++++ origin/v0.11/hack/s3_test/test1/Dockerfile
+@@ -0,0 +1,7 @@
++FROM debian:bullseye-slim AS build
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_first
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_second
++
++FROM scratch
++COPY --link --from=build /unique_first /
++COPY --link --from=build /unique_second /
+diff --git upstream/v0.11/hack/s3_test/test2/Dockerfile origin/v0.11/hack/s3_test/test2/Dockerfile
+new file mode 100644
+index 0000000..cb894a9
+--- /dev/null
++++ origin/v0.11/hack/s3_test/test2/Dockerfile
+@@ -0,0 +1,9 @@
++FROM debian:bullseye-slim AS build
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_first
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_second
++RUN cat /dev/urandom | head -c 100 | sha256sum > unique_third
++
++FROM scratch
++COPY --link --from=build /unique_first /
++COPY --link --from=build /unique_second /
++COPY --link --from=build /unique_third /
 diff --git upstream/v0.11/hack/test origin/v0.11/hack/test
 index cf928f7..929733d 100755
 --- upstream/v0.11/hack/test
@@ -2356,6 +2928,101 @@ index cb98555..0000000
 -	}
 -	return res
 -}
+diff --git upstream/v0.11/util/testutil/integration/azurite.go origin/v0.11/util/testutil/integration/azurite.go
+deleted file mode 100644
+index 87a89cd..0000000
+--- upstream/v0.11/util/testutil/integration/azurite.go
++++ /dev/null
+@@ -1,89 +0,0 @@
+-package integration
+-
+-import (
+-	"fmt"
+-	"net"
+-	"net/http"
+-	"os"
+-	"os/exec"
+-	"testing"
+-	"time"
+-
+-	"github.com/pkg/errors"
+-)
+-
+-const (
+-	azuriteBin = "azurite-blob"
+-)
+-
+-type AzuriteOpts struct {
+-	AccountName string
+-	AccountKey  string
+-}
+-
+-func NewAzuriteServer(t *testing.T, sb Sandbox, opts AzuriteOpts) (address string, cl func() error, err error) {
+-	t.Helper()
+-
+-	if _, err := exec.LookPath(azuriteBin); err != nil {
+-		return "", nil, errors.Wrapf(err, "failed to lookup %s binary", azuriteBin)
+-	}
+-
+-	deferF := &multiCloser{}
+-	cl = deferF.F()
+-
+-	defer func() {
+-		if err != nil {
+-			deferF.F()()
+-			cl = nil
+-		}
+-	}()
+-
+-	l, err := net.Listen("tcp", "localhost:0")
+-	if err != nil {
+-		return "", nil, err
+-	}
+-
+-	addr := l.Addr().String()
+-	if err = l.Close(); err != nil {
+-		return "", nil, err
+-	}
+-	host, port, err := net.SplitHostPort(addr)
+-	if err != nil {
+-		return "", nil, err
+-	}
+-	address = fmt.Sprintf("http://%s/%s", addr, opts.AccountName)
+-
+-	// start server
+-	cmd := exec.Command(azuriteBin, "--disableProductStyleUrl", "--blobHost", host, "--blobPort", port, "--location", t.TempDir())
+-	cmd.Env = append(os.Environ(), []string{
+-		"AZURITE_ACCOUNTS=" + opts.AccountName + ":" + opts.AccountKey,
+-	}...)
+-	azuriteStop, err := startCmd(cmd, sb.Logs())
+-	if err != nil {
+-		return "", nil, err
+-	}
+-	if err = waitAzurite(address, 15*time.Second); err != nil {
+-		azuriteStop()
+-		return "", nil, errors.Wrapf(err, "azurite did not start up: %s", formatLogs(sb.Logs()))
+-	}
+-	deferF.append(azuriteStop)
+-
+-	return
+-}
+-
+-func waitAzurite(address string, d time.Duration) error {
+-	step := 1 * time.Second
+-	i := 0
+-	for {
+-		if resp, err := http.Get(fmt.Sprintf("%s?comp=list", address)); err == nil {
+-			resp.Body.Close()
+-			break
+-		}
+-		i++
+-		if time.Duration(i)*step > d {
+-			return errors.Errorf("failed dialing: %s", address)
+-		}
+-		time.Sleep(step)
+-	}
+-	return nil
+-}
 diff --git upstream/v0.11/util/testutil/integration/dockerd.go origin/v0.11/util/testutil/integration/dockerd.go
 index a692986..b56390e 100644
 --- upstream/v0.11/util/testutil/integration/dockerd.go
@@ -2372,8 +3039,171 @@ index a692986..b56390e 100644
  			FeatureDirectPush,
  			FeatureImageExporter,
  			FeatureMultiCacheExport,
+diff --git upstream/v0.11/util/testutil/integration/minio.go origin/v0.11/util/testutil/integration/minio.go
+deleted file mode 100644
+index 30bc749..0000000
+--- upstream/v0.11/util/testutil/integration/minio.go
++++ /dev/null
+@@ -1,116 +0,0 @@
+-package integration
+-
+-import (
+-	"fmt"
+-	"net"
+-	"net/http"
+-	"os"
+-	"os/exec"
+-	"testing"
+-	"time"
+-
+-	"github.com/pkg/errors"
+-)
+-
+-const (
+-	minioBin = "minio"
+-	mcBin    = "mc"
+-)
+-
+-type MinioOpts struct {
+-	Region          string
+-	AccessKeyID     string
+-	SecretAccessKey string
+-}
+-
+-func NewMinioServer(t *testing.T, sb Sandbox, opts MinioOpts) (address string, bucket string, cl func() error, err error) {
+-	t.Helper()
+-	bucket = randomString(10)
+-
+-	if _, err := exec.LookPath(minioBin); err != nil {
+-		return "", "", nil, errors.Wrapf(err, "failed to lookup %s binary", minioBin)
+-	}
+-	if _, err := exec.LookPath(mcBin); err != nil {
+-		return "", "", nil, errors.Wrapf(err, "failed to lookup %s binary", mcBin)
+-	}
+-
+-	deferF := &multiCloser{}
+-	cl = deferF.F()
+-
+-	defer func() {
+-		if err != nil {
+-			deferF.F()()
+-			cl = nil
+-		}
+-	}()
+-
+-	l, err := net.Listen("tcp", "localhost:0")
+-	if err != nil {
+-		return "", "", nil, err
+-	}
+-
+-	addr := l.Addr().String()
+-	if err = l.Close(); err != nil {
+-		return "", "", nil, err
+-	}
+-	address = "http://" + addr
+-
+-	// start server
+-	cmd := exec.Command(minioBin, "server", "--json", "--address", addr, t.TempDir())
+-	cmd.Env = append(os.Environ(), []string{
+-		"MINIO_ROOT_USER=" + opts.AccessKeyID,
+-		"MINIO_ROOT_PASSWORD=" + opts.SecretAccessKey,
+-	}...)
+-	minioStop, err := startCmd(cmd, sb.Logs())
+-	if err != nil {
+-		return "", "", nil, err
+-	}
+-	if err = waitMinio(address, 15*time.Second); err != nil {
+-		minioStop()
+-		return "", "", nil, errors.Wrapf(err, "minio did not start up: %s", formatLogs(sb.Logs()))
+-	}
+-	deferF.append(minioStop)
+-
+-	// create alias config
+-	alias := randomString(10)
+-	cmd = exec.Command(mcBin, "alias", "set", alias, address, opts.AccessKeyID, opts.SecretAccessKey)
+-	if err := runCmd(cmd, sb.Logs()); err != nil {
+-		return "", "", nil, err
+-	}
+-	deferF.append(func() error {
+-		return exec.Command(mcBin, "alias", "rm", alias).Run()
+-	})
+-
+-	// create bucket
+-	cmd = exec.Command(mcBin, "mb", "--region", opts.Region, fmt.Sprintf("%s/%s", alias, bucket)) // #nosec G204
+-	if err := runCmd(cmd, sb.Logs()); err != nil {
+-		return "", "", nil, err
+-	}
+-
+-	// trace
+-	cmd = exec.Command(mcBin, "admin", "trace", "--json", alias)
+-	traceStop, err := startCmd(cmd, sb.Logs())
+-	if err != nil {
+-		return "", "", nil, err
+-	}
+-	deferF.append(traceStop)
+-
+-	return
+-}
+-
+-func waitMinio(address string, d time.Duration) error {
+-	step := 1 * time.Second
+-	i := 0
+-	for {
+-		if resp, err := http.Get(fmt.Sprintf("%s/minio/health/live", address)); err == nil {
+-			resp.Body.Close()
+-			break
+-		}
+-		i++
+-		if time.Duration(i)*step > d {
+-			return errors.Errorf("failed dialing: %s", address)
+-		}
+-		time.Sleep(step)
+-	}
+-	return nil
+-}
+diff --git upstream/v0.11/util/testutil/integration/pins.go origin/v0.11/util/testutil/integration/pins.go
+index 4b4ce4a..1d7e49a 100644
+--- upstream/v0.11/util/testutil/integration/pins.go
++++ origin/v0.11/util/testutil/integration/pins.go
+@@ -1,17 +1,16 @@
+ package integration
+ 
+ var pins = map[string]map[string]string{
+-	// busybox 1.36
++	// busybox is pinned to 1.35. Newer produces has "illegal instruction" panic on some of Github infra on sha256sum
+ 	"busybox:latest": {
+-		"amd64":   "sha256:023917ec6a886d0e8e15f28fb543515a5fcd8d938edb091e8147db4efed388ee",
+-		"arm64v8": "sha256:1fa89c01cd0473cedbd1a470abb8c139eeb80920edf1bc55de87851bfb63ea11",
+-		"library": "sha256:3fbc632167424a6d997e74f52b878d7cc478225cffac6bc977eedfe51c7f4e79",
++		"amd64":   "sha256:0d5a701f0ca53f38723108687add000e1922f812d4187dea7feaee85d2f5a6c5",
++		"arm64v8": "sha256:ffe38d75e44d8ffac4cd6d09777ffc31e94ea0ded6a0164e825a325dc17a3b68",
++		"library": "sha256:f4ed5f2163110c26d42741fdc92bd1710e118aed4edb19212548e8ca4e5fca22",
+ 	},
+-	// alpine 3.18
+ 	"alpine:latest": {
+-		"amd64":   "sha256:25fad2a32ad1f6f510e528448ae1ec69a28ef81916a004d3629874104f8a7f70",
+-		"arm64v8": "sha256:e3bd82196e98898cae9fe7fbfd6e2436530485974dc4fb3b7ddb69134eda2407",
+-		"library": "sha256:82d1e9d7ed48a7523bdebc18cf6290bdb97b82302a8a9c27d4fe885949ea94d1",
++		"amd64":   "sha256:c0d488a800e4127c334ad20d61d7bc21b4097540327217dfab52262adc02380c",
++		"arm64v8": "sha256:af06af3514c44a964d3b905b498cf6493db8f1cde7c10e078213a89c87308ba0",
++		"library": "sha256:8914eb54f968791faf6a8638949e480fef81e697984fba772b3976835194c6d4",
+ 	},
+ 	"debian:bullseye-20230109-slim": {
+ 		"amd64":   "sha256:1acb06a0c31fb467eb8327ad361f1091ab265e0bf26d452dea45dcb0c0ea5e75",
+diff --git upstream/v0.11/util/testutil/integration/run.go origin/v0.11/util/testutil/integration/run.go
+index ed23ee3..18f6f0b 100644
+--- upstream/v0.11/util/testutil/integration/run.go
++++ origin/v0.11/util/testutil/integration/run.go
+@@ -45,7 +45,6 @@ type Sandbox interface {
+ 
+ 	Context() context.Context
+ 	Cmd(...string) *exec.Cmd
+-	Logs() map[string]*bytes.Buffer
+ 	PrintLogs(*testing.T)
+ 	ClearLogs()
+ 	NewRegistry() (string, error)
 diff --git upstream/v0.11/util/testutil/integration/sandbox.go origin/v0.11/util/testutil/integration/sandbox.go
-index 1289bb5..8eb90cd 100644
+index 5a6f519..8eb90cd 100644
 --- upstream/v0.11/util/testutil/integration/sandbox.go
 +++ origin/v0.11/util/testutil/integration/sandbox.go
 @@ -46,20 +46,6 @@ func (b backend) Snapshotter() string {
@@ -2397,7 +3227,18 @@ index 1289bb5..8eb90cd 100644
  	for _, unsupportedFeature := range b.unsupportedFeatures {
  		if feature == unsupportedFeature {
  			return true
-@@ -280,55 +266,41 @@ func printLogs(logs map[string]*bytes.Buffer, f func(args ...interface{})) {
+@@ -86,10 +72,6 @@ func (sb *sandbox) Context() context.Context {
+ 	return sb.ctx
+ }
+ 
+-func (sb *sandbox) Logs() map[string]*bytes.Buffer {
+-	return sb.logs
+-}
+-
+ func (sb *sandbox) PrintLogs(t *testing.T) {
+ 	printLogs(sb.logs, t.Log)
+ }
+@@ -284,55 +266,41 @@ func printLogs(logs map[string]*bytes.Buffer, f func(args ...interface{})) {
  }
  
  const (
@@ -2485,6 +3326,76 @@ index 1289bb5..8eb90cd 100644
  }
  
  func CheckFeatureCompat(t *testing.T, sb Sandbox, reason ...string) {
+diff --git upstream/v0.11/util/testutil/integration/util.go origin/v0.11/util/testutil/integration/util.go
+index 6654492..6c7a5a5 100644
+--- upstream/v0.11/util/testutil/integration/util.go
++++ origin/v0.11/util/testutil/integration/util.go
+@@ -3,7 +3,6 @@ package integration
+ import (
+ 	"bytes"
+ 	"context"
+-	"crypto/rand"
+ 	"fmt"
+ 	"io"
+ 	"net"
+@@ -21,20 +20,17 @@ import (
+ 	"golang.org/x/sync/errgroup"
+ )
+ 
+-func runCmd(cmd *exec.Cmd, logs map[string]*bytes.Buffer) error {
+-	if logs != nil {
+-		setCmdLogs(cmd, logs)
+-	}
+-	fmt.Fprintf(cmd.Stderr, "> runCmd %v %+v\n", time.Now(), cmd.String())
+-	return cmd.Run()
+-}
+-
+ func startCmd(cmd *exec.Cmd, logs map[string]*bytes.Buffer) (func() error, error) {
+ 	if logs != nil {
+-		setCmdLogs(cmd, logs)
++		b := new(bytes.Buffer)
++		logs["stdout: "+cmd.Path] = b
++		cmd.Stdout = &lockingWriter{Writer: b}
++		b = new(bytes.Buffer)
++		logs["stderr: "+cmd.Path] = b
++		cmd.Stderr = &lockingWriter{Writer: b}
+ 	}
+ 
+-	fmt.Fprintf(cmd.Stderr, "> startCmd %v %+v\n", time.Now(), cmd.String())
++	fmt.Fprintf(cmd.Stderr, "> startCmd %v %+v\n", time.Now(), cmd.Args)
+ 
+ 	if err := cmd.Start(); err != nil {
+ 		return nil, err
+@@ -79,15 +75,6 @@ func startCmd(cmd *exec.Cmd, logs map[string]*bytes.Buffer) (func() error, error
+ 	}, nil
+ }
+ 
+-func setCmdLogs(cmd *exec.Cmd, logs map[string]*bytes.Buffer) {
+-	b := new(bytes.Buffer)
+-	logs["stdout: "+cmd.String()] = b
+-	cmd.Stdout = &lockingWriter{Writer: b}
+-	b = new(bytes.Buffer)
+-	logs["stderr: "+cmd.String()] = b
+-	cmd.Stderr = &lockingWriter{Writer: b}
+-}
+-
+ func waitUnix(address string, d time.Duration) error {
+ 	address = strings.TrimPrefix(address, "unix://")
+ 	addr, err := net.ResolveUnixAddr("unix", address)
+@@ -180,13 +167,3 @@ func Tmpdir(t *testing.T, appliers ...fstest.Applier) (string, error) {
+ 	}
+ 	return tmpdir, nil
+ }
+-
+-func randomString(n int) string {
+-	chars := "abcdefghijklmnopqrstuvwxyz"
+-	var b = make([]byte, n)
+-	_, _ = rand.Read(b)
+-	for k, v := range b {
+-		b[k] = chars[v%byte(len(chars))]
+-	}
+-	return string(b)
+-}
 diff --git upstream/v0.11/vendor/github.com/Microsoft/hcsshim/internal/hcs/process.go origin/v0.11/vendor/github.com/Microsoft/hcsshim/internal/hcs/process.go
 index 78490d6..f460592 100644
 --- upstream/v0.11/vendor/github.com/Microsoft/hcsshim/internal/hcs/process.go
@@ -2610,14 +3521,14 @@ index e162f0a..4bf8459 100644
 -    - reports
 -    - test # e2e scripts
 diff --git upstream/v0.11/vendor/github.com/containerd/containerd/Vagrantfile origin/v0.11/vendor/github.com/containerd/containerd/Vagrantfile
-index a4a05ed..e81bfc2 100644
+index f706788..e81bfc2 100644
 --- upstream/v0.11/vendor/github.com/containerd/containerd/Vagrantfile
 +++ origin/v0.11/vendor/github.com/containerd/containerd/Vagrantfile
 @@ -93,7 +93,7 @@ EOF
    config.vm.provision "install-golang", type: "shell", run: "once" do |sh|
      sh.upload_path = "/tmp/vagrant-install-golang"
      sh.env = {
--        'GO_VERSION': ENV['GO_VERSION'] || "1.19.7",
+-        'GO_VERSION': ENV['GO_VERSION'] || "1.19.9",
 +        'GO_VERSION': ENV['GO_VERSION'] || "1.19.6",
      }
      sh.inline = <<~SHELL
@@ -2928,6 +3839,18 @@ index 98ad8f9..0000000
 -
 -	return nil
 -}
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/container.go origin/v0.11/vendor/github.com/containerd/containerd/container.go
+index 2cf1566..7d8d674 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/container.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/container.go
+@@ -279,7 +279,6 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
+ 			})
+ 		}
+ 	}
+-	request.RuntimePath = info.RuntimePath
+ 	if info.Options != nil {
+ 		any, err := typeurl.MarshalAny(info.Options)
+ 		if err != nil {
 diff --git upstream/v0.11/vendor/github.com/containerd/containerd/containerstore.go origin/v0.11/vendor/github.com/containerd/containerd/containerstore.go
 index bdd1c60..2756e2a 100644
 --- upstream/v0.11/vendor/github.com/containerd/containerd/containerstore.go
@@ -2986,6 +3909,72 @@ index a970282..fd79e89 100644
  		images = append(images, imageFromProto(&image))
  	}
  
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/images/archive/exporter.go origin/v0.11/vendor/github.com/containerd/containerd/images/archive/exporter.go
+index 6943a7f..40a0a33 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/images/archive/exporter.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/images/archive/exporter.go
+@@ -176,7 +176,7 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts
+ 			}
+ 
+ 			name := desc.Annotations[images.AnnotationImageName]
+-			if name != "" {
++			if name != "" && !eo.skipDockerManifest {
+ 				mt.names = append(mt.names, name)
+ 			}
+ 		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+@@ -215,24 +215,26 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts
+ 					records = append(records, r...)
+ 				}
+ 
+-				if len(manifests) >= 1 {
+-					if len(manifests) > 1 {
+-						sort.SliceStable(manifests, func(i, j int) bool {
+-							if manifests[i].Platform == nil {
+-								return false
+-							}
+-							if manifests[j].Platform == nil {
+-								return true
+-							}
+-							return eo.platform.Less(*manifests[i].Platform, *manifests[j].Platform)
+-						})
+-					}
+-					d = manifests[0].Digest
+-					dManifests[d] = &exportManifest{
+-						manifest: manifests[0],
++				if !eo.skipDockerManifest {
++					if len(manifests) >= 1 {
++						if len(manifests) > 1 {
++							sort.SliceStable(manifests, func(i, j int) bool {
++								if manifests[i].Platform == nil {
++									return false
++								}
++								if manifests[j].Platform == nil {
++									return true
++								}
++								return eo.platform.Less(*manifests[i].Platform, *manifests[j].Platform)
++							})
++						}
++						d = manifests[0].Digest
++						dManifests[d] = &exportManifest{
++							manifest: manifests[0],
++						}
++					} else if eo.platform != nil {
++						return fmt.Errorf("no manifest found for platform: %w", errdefs.ErrNotFound)
+ 					}
+-				} else if eo.platform != nil {
+-					return fmt.Errorf("no manifest found for platform: %w", errdefs.ErrNotFound)
+ 				}
+ 				resolvedIndex[desc.Digest] = d
+ 			}
+@@ -248,7 +250,7 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts
+ 		}
+ 	}
+ 
+-	if !eo.skipDockerManifest && len(dManifests) > 0 {
++	if len(dManifests) > 0 {
+ 		tr, err := manifestsRecord(ctx, store, dManifests)
+ 		if err != nil {
+ 			return fmt.Errorf("unable to create manifests file: %w", err)
 diff --git upstream/v0.11/vendor/github.com/containerd/containerd/images/converter/default.go origin/v0.11/vendor/github.com/containerd/containerd/images/converter/default.go
 index 65224bd..f4e944b 100644
 --- upstream/v0.11/vendor/github.com/containerd/containerd/images/converter/default.go
@@ -3092,7 +4081,7 @@ index 889d49c..13eedaf 100644
  	if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
  		return xdg
 diff --git upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts.go origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts.go
-index cd251c3..3330ad1 100644
+index 65811fc..3330ad1 100644
 --- upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts.go
 +++ origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts.go
 @@ -76,6 +76,7 @@ func setLinux(s *Spec) {
@@ -3201,6 +4190,98 @@ index cd251c3..3330ad1 100644
  
  			s.Process.Cwd = config.WorkingDir
  			s.Process.User = specs.User{
+@@ -663,11 +617,8 @@ func WithUser(userstr string) SpecOpts {
+ 				return err
+ 			}
+ 
+-			// Use a read-only mount when trying to get user/group information
+-			// from the container's rootfs. Since the option does read operation
+-			// only, we append ReadOnly mount option to prevent the Linux kernel
+-			// from syncing whole filesystem in umount syscall.
+-			return mount.WithReadonlyTempMount(ctx, mounts, f)
++			mounts = tryReadonlyMounts(mounts)
++			return mount.WithTempMount(ctx, mounts, f)
+ 		default:
+ 			return fmt.Errorf("invalid USER value %s", userstr)
+ 		}
+@@ -727,11 +678,8 @@ func WithUserID(uid uint32) SpecOpts {
+ 			return err
+ 		}
+ 
+-		// Use a read-only mount when trying to get user/group information
+-		// from the container's rootfs. Since the option does read operation
+-		// only, we append ReadOnly mount option to prevent the Linux kernel
+-		// from syncing whole filesystem in umount syscall.
+-		return mount.WithReadonlyTempMount(ctx, mounts, setUser)
++		mounts = tryReadonlyMounts(mounts)
++		return mount.WithTempMount(ctx, mounts, setUser)
+ 	}
+ }
+ 
+@@ -775,11 +723,8 @@ func WithUsername(username string) SpecOpts {
+ 				return err
+ 			}
+ 
+-			// Use a read-only mount when trying to get user/group information
+-			// from the container's rootfs. Since the option does read operation
+-			// only, we append ReadOnly mount option to prevent the Linux kernel
+-			// from syncing whole filesystem in umount syscall.
+-			return mount.WithReadonlyTempMount(ctx, mounts, setUser)
++			mounts = tryReadonlyMounts(mounts)
++			return mount.WithTempMount(ctx, mounts, setUser)
+ 		} else if s.Windows != nil {
+ 			s.Process.User.Username = username
+ 		} else {
+@@ -857,11 +802,8 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
+ 			return err
+ 		}
+ 
+-		// Use a read-only mount when trying to get user/group information
+-		// from the container's rootfs. Since the option does read operation
+-		// only, we append ReadOnly mount option to prevent the Linux kernel
+-		// from syncing whole filesystem in umount syscall.
+-		return mount.WithReadonlyTempMount(ctx, mounts, setAdditionalGids)
++		mounts = tryReadonlyMounts(mounts)
++		return mount.WithTempMount(ctx, mounts, setAdditionalGids)
+ 	}
+ }
+ 
+@@ -922,11 +864,8 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
+ 			return err
+ 		}
+ 
+-		// Use a read-only mount when trying to get user/group information
+-		// from the container's rootfs. Since the option does read operation
+-		// only, we append ReadOnly mount option to prevent the Linux kernel
+-		// from syncing whole filesystem in umount syscall.
+-		return mount.WithReadonlyTempMount(ctx, mounts, setAdditionalGids)
++		mounts = tryReadonlyMounts(mounts)
++		return mount.WithTempMount(ctx, mounts, setAdditionalGids)
+ 	}
+ }
+ 
+@@ -1404,3 +1343,21 @@ func WithDevShmSize(kb int64) SpecOpts {
+ 		return ErrNoShmMount
+ 	}
+ }
++
++// tryReadonlyMounts is used by the options which are trying to get user/group
++// information from container's rootfs. Since the option does read operation
++// only, this helper will append ReadOnly mount option to prevent linux kernel
++// from syncing whole filesystem in umount syscall.
++//
++// TODO(fuweid):
++//
++// Currently, it only works for overlayfs. I think we can apply it to other
++// kinds of filesystem. Maybe we can return `ro` option by `snapshotter.Mount`
++// API, when the caller passes that experimental annotation
++// `containerd.io/snapshot/readonly.mount` something like that.
++func tryReadonlyMounts(mounts []mount.Mount) []mount.Mount {
++	if len(mounts) == 1 && mounts[0].Type == "overlay" {
++		mounts[0].Options = append(mounts[0].Options, "ro")
++	}
++	return mounts
++}
 diff --git upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_linux.go origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_linux.go
 index 34651d1..4d8841e 100644
 --- upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_linux.go
@@ -3263,7 +4344,7 @@ index a616577..9d03091 100644
 -	panic("not supported")
 -}
 diff --git upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_windows.go origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_windows.go
-index 4ddb13d..5502257 100644
+index 602d40e..5502257 100644
 --- upstream/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_windows.go
 +++ origin/v0.11/vendor/github.com/containerd/containerd/oci/spec_opts_windows.go
 @@ -19,12 +19,9 @@ package oci
@@ -3279,7 +4360,24 @@ index 4ddb13d..5502257 100644
  )
  
  // WithWindowsCPUCount sets the `Windows.Resources.CPU.Count` section to the
-@@ -92,11 +89,3 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
+@@ -68,16 +65,6 @@ func WithWindowNetworksAllowUnqualifiedDNSQuery() SpecOpts {
+ 	}
+ }
+ 
+-// WithProcessCommandLine replaces the command line on the generated spec
+-func WithProcessCommandLine(cmdLine string) SpecOpts {
+-	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+-		setProcess(s)
+-		s.Process.Args = nil
+-		s.Process.CommandLine = cmdLine
+-		return nil
+-	}
+-}
+-
+ // WithHostDevices adds all the hosts device nodes to the container's spec
+ //
+ // Not supported on windows
+@@ -102,11 +89,3 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
  		return nil
  	}
  }
@@ -3326,15 +4424,44 @@ index 1ef223d..25436b6 100644
  // "docker.io" and "library/" repository prefix removed.
  // For example, "docker.io/library/redis" will have the familiar
  // name "redis" and "docker.io/dmcgowan/myapp" will be "dmcgowan/myapp".
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/task.go origin/v0.11/vendor/github.com/containerd/containerd/task.go
+index 9be1394..105d4fb 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/task.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/task.go
+@@ -139,11 +139,6 @@ type TaskInfo struct {
+ 	RootFS []mount.Mount
+ 	// Options hold runtime specific settings for task creation
+ 	Options interface{}
+-	// RuntimePath is an absolute path that can be used to overwrite path
+-	// to a shim runtime binary.
+-	RuntimePath string
+-
+-	// runtime is the runtime name for the container, and cannot be changed.
+ 	runtime string
+ }
+ 
+diff --git upstream/v0.11/vendor/github.com/containerd/containerd/task_opts.go origin/v0.11/vendor/github.com/containerd/containerd/task_opts.go
+index 67e6527..56f3cba 100644
+--- upstream/v0.11/vendor/github.com/containerd/containerd/task_opts.go
++++ origin/v0.11/vendor/github.com/containerd/containerd/task_opts.go
+@@ -49,7 +49,7 @@ func WithRootFS(mounts []mount.Mount) NewTaskOpts {
+ // instead of resolving it from runtime name.
+ func WithRuntimePath(absRuntimePath string) NewTaskOpts {
+ 	return func(ctx context.Context, client *Client, info *TaskInfo) error {
+-		info.RuntimePath = absRuntimePath
++		info.runtime = absRuntimePath
+ 		return nil
+ 	}
+ }
 diff --git upstream/v0.11/vendor/github.com/containerd/containerd/version/version.go origin/v0.11/vendor/github.com/containerd/containerd/version/version.go
-index e059391..ca1b677 100644
+index 2fee285..ca1b677 100644
 --- upstream/v0.11/vendor/github.com/containerd/containerd/version/version.go
 +++ origin/v0.11/vendor/github.com/containerd/containerd/version/version.go
 @@ -23,7 +23,7 @@ var (
  	Package = "github.com/containerd/containerd"
  
  	// Version holds the complete version number. Filled in at linking time.
--	Version = "1.6.20+unknown"
+-	Version = "1.6.21+unknown"
 +	Version = "1.6.18+unknown"
  
  	// Revision is filled with the VCS (e.g. git) revision being used to build
@@ -3515,7 +4642,7 @@ index 1afd590..31f99cf 100644
  	// VersionDev indicates development branch. Releases will be empty string.
  	VersionDev = "-dev"
 diff --git upstream/v0.11/vendor/modules.txt origin/v0.11/vendor/modules.txt
-index d47b48e..414a396 100644
+index 144a7cd..414a396 100644
 --- upstream/v0.11/vendor/modules.txt
 +++ origin/v0.11/vendor/modules.txt
 @@ -58,7 +58,7 @@ github.com/Microsoft/go-winio/backuptar
@@ -3531,7 +4658,7 @@ index d47b48e..414a396 100644
  # github.com/containerd/console v1.0.3
  ## explicit; go 1.13
  github.com/containerd/console
--# github.com/containerd/containerd v1.6.20
+-# github.com/containerd/containerd v1.6.21
 +# github.com/containerd/containerd v1.6.18
  ## explicit; go 1.17
  github.com/containerd/containerd
