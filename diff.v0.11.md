@@ -1098,7 +1098,7 @@ index a6bc37a..1376c15 100644
  	c, err := New(sb.Context(), sb.Address())
  	require.NoError(t, err)
 diff --git upstream/v0.11/client/client_test.go origin/v0.11/client/client_test.go
-index 8c2245c..b97eb75 100644
+index 3ac3b65..b97eb75 100644
 --- upstream/v0.11/client/client_test.go
 +++ origin/v0.11/client/client_test.go
 @@ -112,8 +112,6 @@ func TestIntegration(t *testing.T) {
@@ -1308,12 +1308,16 @@ index 8c2245c..b97eb75 100644
  	dir := t.TempDir()
  	im := CacheOptionsEntry{
  		Type: "local",
-@@ -4739,83 +4687,8 @@ func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4739,91 +4687,8 @@ func testBasicLocalCacheImportExport(t *testing.T, sb integration.Sandbox) {
  	testBasicCacheImportExport(t, sb, []CacheOptionsEntry{im}, []CacheOptionsEntry{ex})
  }
  
 -func testBasicS3CacheImportExport(t *testing.T, sb integration.Sandbox) {
--	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendS3,
+-	)
 -
 -	opts := integration.MinioOpts{
 -		Region:          "us-east-1",
@@ -1351,7 +1355,11 @@ index 8c2245c..b97eb75 100644
 -}
 -
 -func testBasicAzblobCacheImportExport(t *testing.T, sb integration.Sandbox) {
--	integration.CheckFeatureCompat(t, sb, integration.FeatureCacheExport)
+-	integration.CheckFeatureCompat(t, sb,
+-		integration.FeatureCacheExport,
+-		integration.FeatureCacheImport,
+-		integration.FeatureCacheBackendAzblob,
+-	)
 -
 -	opts := integration.AzuriteOpts{
 -		AccountName: "azblobcacheaccount",
@@ -1393,7 +1401,7 @@ index 8c2245c..b97eb75 100644
  	requiresLinux(t)
  	registry, err := sb.NewRegistry()
  	if errors.Is(err, integration.ErrRequirements) {
-@@ -4867,7 +4740,6 @@ func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
+@@ -4875,7 +4740,6 @@ func testBasicInlineCacheImportExport(t *testing.T, sb integration.Sandbox) {
  	require.NoError(t, err)
  
  	ensurePruneAll(t, c, sb)
@@ -1401,7 +1409,7 @@ index 8c2245c..b97eb75 100644
  
  	resp, err = c.Solve(sb.Context(), def, SolveOpt{
  		// specifying inline cache exporter is needed for reproducing containerimage.digest
-@@ -5742,7 +5614,6 @@ func testProxyEnv(t *testing.T, sb integration.Sandbox) {
+@@ -5750,7 +5614,6 @@ func testProxyEnv(t *testing.T, sb integration.Sandbox) {
  }
  
  func testMergeOp(t *testing.T, sb integration.Sandbox) {
@@ -1409,7 +1417,7 @@ index 8c2245c..b97eb75 100644
  	requiresLinux(t)
  
  	c, err := New(sb.Context(), sb.Address())
-@@ -5855,7 +5726,7 @@ func testMergeOpCacheMax(t *testing.T, sb integration.Sandbox) {
+@@ -5863,7 +5726,7 @@ func testMergeOpCacheMax(t *testing.T, sb integration.Sandbox) {
  
  func testMergeOpCache(t *testing.T, sb integration.Sandbox, mode string) {
  	t.Helper()
@@ -1418,7 +1426,7 @@ index 8c2245c..b97eb75 100644
  	requiresLinux(t)
  
  	cdAddress := sb.ContainerdAddress()
-@@ -9019,31 +8890,3 @@ func testSourcePolicy(t *testing.T, sb integration.Sandbox) {
+@@ -9027,31 +8890,3 @@ func testSourcePolicy(t *testing.T, sb integration.Sandbox) {
  		require.ErrorContains(t, err, sourcepolicy.ErrSourceDenied.Error())
  	})
  }
