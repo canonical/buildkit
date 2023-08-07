@@ -1483,7 +1483,7 @@ index b7fc957..61fdc9b 100644
  		t.Skip("rootless")
  	}
 diff --git upstream/v0.11/docs/rootless.md origin/v0.11/docs/rootless.md
-index 2dabfbd..ee25875 100644
+index 14a827f..ee25875 100644
 --- upstream/v0.11/docs/rootless.md
 +++ origin/v0.11/docs/rootless.md
 @@ -24,12 +24,6 @@ spec:
@@ -1499,7 +1499,7 @@ index 2dabfbd..ee25875 100644
  <details>
  <summary>Old distributions</summary>
  
-@@ -110,11 +104,6 @@ See https://rootlesscontaine.rs/getting-started/common/subuid/
+@@ -110,15 +104,6 @@ See https://rootlesscontaine.rs/getting-started/common/subuid/
  ### Error `Options:[rbind ro]}]: operation not permitted`
  Make sure to mount an `emptyDir` volume on `/home/user/.local/share/buildkit` .
  
@@ -1507,6 +1507,10 @@ index 2dabfbd..ee25875 100644
 -Run `sysctl -w user.max_user_namespaces=N` (N=positive integer, like 63359) on the host nodes.
 -
 -See [`../examples/kubernetes/sysctl-userns.privileged.yaml`](../examples/kubernetes/sysctl-userns.privileged.yaml).
+-
+-### Error `mount proc:/proc (via /proc/self/fd/6), flags: 0xe: operation not permitted`
+-This error is known to happen when BuildKit is executed in a container without the `--oci-worker-no-sandbox` flag.
+-Make sure that `--oci-worker-no-process-sandbox` is specified (See [below](#docker)).
 -
  ## Containerized deployment
  
