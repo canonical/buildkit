@@ -1482,6 +1482,35 @@ index b7fc957..61fdc9b 100644
  	if tc.skipOnRootless && sb.Rootless() {
  		t.Skip("rootless")
  	}
+diff --git upstream/v0.11/docs/build-repro.md origin/v0.11/docs/build-repro.md
+index db139b0..9b83ec0 100644
+--- upstream/v0.11/docs/build-repro.md
++++ origin/v0.11/docs/build-repro.md
+@@ -73,12 +73,20 @@ Workaround:
+ # Workaround for https://github.com/moby/buildkit/issues/3180
+ ARG SOURCE_DATE_EPOCH
+ RUN find $( ls / | grep -E -v "^(dev|mnt|proc|sys)$" ) -newermt "@${SOURCE_DATE_EPOCH}" -writable -xdev | xargs touch --date="@${SOURCE_DATE_EPOCH}" --no-dereference
++```
++
++The `touch` command above is [not effective](https://github.com/moby/buildkit/issues/3309) for mount point directories.
++A workaround is to create mount point directories below `/dev` (tmpfs) so that the mount points will not be included in the image layer.
++
++### Timestamps of whiteouts
++Currently, the `SOURCE_DATE_EPOCH` value is not used for the timestamps of "whiteouts" that are created on removing files.
+ 
+-# Squashing is needed so that only files with the defined timestamp from the last layer are added to the image.
+-# This squashing also addresses non-reproducibility of whiteout timestamps (https://github.com/moby/buildkit/issues/3168) on BuildKit prior to v0.12.
++Workaround:
++```dockerfile
++# Squash the entire stage for resetting the whiteout timestamps.
++# Workaround for https://github.com/moby/buildkit/issues/3168
+ FROM scratch
+ COPY --from=0 / /
+ ```
+ 
+-The `touch` command above is [not effective](https://github.com/moby/buildkit/issues/3309) for mount point directories.
+-A workaround is to create mount point directories below `/dev` (tmpfs) so that the mount points will not be included in the image layer.
++The timestamps of the regular files in the original stage are maintained in the squashed stage, so you do not need to touch the files after this `COPY` instruction.
 diff --git upstream/v0.11/docs/rootless.md origin/v0.11/docs/rootless.md
 index 14a827f..ee25875 100644
 --- upstream/v0.11/docs/rootless.md
@@ -1644,7 +1673,7 @@ index 5c3bdee..36b27aa 100644
  	img.Config.WorkingDir = "/"
  	img.Config.Env = []string{"PATH=" + system.DefaultPathEnv(platform.OS)}
 diff --git upstream/v0.11/frontend/dockerfile/dockerfile_test.go origin/v0.11/frontend/dockerfile/dockerfile_test.go
-index 2914f7c..82f829c 100644
+index becbadd..82f829c 100644
 --- upstream/v0.11/frontend/dockerfile/dockerfile_test.go
 +++ origin/v0.11/frontend/dockerfile/dockerfile_test.go
 @@ -419,7 +419,7 @@ RUN [ "$(cat testfile)" == "contents0" ]
@@ -1679,7 +1708,15 @@ index 2914f7c..82f829c 100644
  	f := getFrontend(t, sb)
  
  	registry, err := sb.NewRegistry()
-@@ -6562,10 +6557,7 @@ FROM scratch
+@@ -6556,16 +6551,13 @@ RUN rm -f /foo-2030.1
+ ARG SOURCE_DATE_EPOCH
+ RUN find $( ls / | grep -E -v "^(dev|mnt|proc|sys)$" ) -newermt "@${SOURCE_DATE_EPOCH}" -writable -xdev | xargs touch --date="@${SOURCE_DATE_EPOCH}" --no-dereference
+ 
+-# Squashing is needed to apply the touched timestamps across multiple "RUN" instructions.
+-# This squashing also addresses non-reproducibility of whiteout timestamps (https://github.com/moby/buildkit/issues/3168).
++# Squash the entire stage for resetting the whiteout timestamps.
++# Workaround for https://github.com/moby/buildkit/issues/3168
+ FROM scratch
  COPY --from=0 / /
  `)
  
