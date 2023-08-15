@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index c8e4b9b..a642b9e 100644
+index c8e4b9b..036c96b 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -13,8 +13,9 @@ on:
@@ -25,7 +25,7 @@ index c8e4b9b..a642b9e 100644
    REPO_SLUG_ORIGIN: "moby/buildkit:v0.11.0-rc4"
 -  REPO_SLUG_TARGET: "moby/buildkit"
 +  # this is the one that matters, as it is our desired rebased output
-+  REPO_SLUG_TARGET: "ghcr.io/canonical/buildkit"
++  REPO_SLUG_TARGET: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ARTIFACTORY_REGISTRY_REPO || 'ghcr.io/canonical/buildkit' }}
 +  # we aren't gonna touch this
    DF_REPO_SLUG_TARGET: "docker/dockerfile-upstream"
 -  PLATFORMS: "linux/amd64,linux/arm/v7,linux/arm64,linux/s390x,linux/ppc64le,linux/riscv64"
@@ -101,7 +101,7 @@ index c8e4b9b..a642b9e 100644
  
    release-base:
      runs-on: ubuntu-20.04
-@@ -314,7 +351,12 @@ jobs:
+@@ -314,7 +351,11 @@ jobs:
        matrix:
          target-stage:
            - ''
@@ -111,11 +111,10 @@ index c8e4b9b..a642b9e 100644
 +      TARGET: ${{ matrix.target-stage }}
 +      RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
 +      CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
-+      REGISTRY_TARGET: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ARTIFACTORY_REGISTRY_REPO || env.REPO_SLUG_TARGET }}
      steps:
        -
          name: Checkout
-@@ -328,26 +370,52 @@ jobs:
+@@ -328,26 +369,52 @@ jobs:
        -
          name: Set up Docker Buildx
          uses: docker/setup-buildx-action@v2
@@ -140,7 +139,7 @@ index c8e4b9b..a642b9e 100644
 +        name: Build local image for testing
          run: |
 -          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" "${{ needs.release-base.outputs.push }}"
-+          ./hack/images local "$REGISTRY_TARGET" "nopush"
++          ./hack/images local "$REPO_SLUG_TARGET" "nopush"
          env:
 -          RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
 -          TARGET: ${{ matrix.target-stage }}
@@ -160,13 +159,13 @@ index c8e4b9b..a642b9e 100644
 +
 +          ./hack/canonical_test/run_test.sh
 +        env:
-+          IMG_NAME: '${{ env.REGISTRY_TARGET }}:local'
++          IMG_NAME: '${{ env.REPO_SLUG_TARGET }}:local'
 +      -
 +        name: Push ${{ needs.release-base.outputs.tag }} to GHCR
 +        if: needs.release-base.outputs.push == 'push'
 +        run: |
 +          docker buildx use ${{ steps.setup-buildx-builder.outputs.name }}
-+          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REGISTRY_TARGET" push
++          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" push
 +        env:
 +          # have CACHE_FROM here cause the "env" context is not available at the job level
 +          CACHE_FROM: "type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}"
@@ -177,7 +176,7 @@ index c8e4b9b..a642b9e 100644
  
    binaries:
      runs-on: ubuntu-20.04
-@@ -375,7 +443,9 @@ jobs:
+@@ -375,7 +442,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -188,7 +187,7 @@ index c8e4b9b..a642b9e 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -395,82 +465,83 @@ jobs:
+@@ -395,82 +464,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
