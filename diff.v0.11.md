@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index c8e4b9b..036c96b 100644
+index c8e4b9b..375b49c 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -13,8 +13,9 @@ on:
@@ -114,7 +114,7 @@ index c8e4b9b..036c96b 100644
      steps:
        -
          name: Checkout
-@@ -328,26 +369,52 @@ jobs:
+@@ -328,26 +369,56 @@ jobs:
        -
          name: Set up Docker Buildx
          uses: docker/setup-buildx-action@v2
@@ -128,12 +128,16 @@ index c8e4b9b..036c96b 100644
 +        name: Login to GHCR
          if: needs.release-base.outputs.push == 'push'
          uses: docker/login-action@v2
++        env:
++          REGISTRY: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ARTIFACTORY_REGISTRY || 'ghcr.io' }}
++          USERNAME: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ARTIFACTORY_USER || github.actor }}
++          PASSWORD: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ARTIFACTORY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
          with:
 -          username: ${{ secrets.DOCKERHUB_USERNAME }}
 -          password: ${{ secrets.DOCKERHUB_TOKEN }}
-+          registry: ghcr.io
-+          username: ${{ github.actor }}
-+          password: ${{ secrets.GITHUB_TOKEN }}
++          registry: ${{ env.REGISTRY }}
++          username: ${{ env.USERNAME }}
++          password: ${{ env.PASSWORD }}
        -
 -        name: Build ${{ needs.release-base.outputs.tag }}
 +        name: Build local image for testing
@@ -176,7 +180,7 @@ index c8e4b9b..036c96b 100644
  
    binaries:
      runs-on: ubuntu-20.04
-@@ -375,7 +442,9 @@ jobs:
+@@ -375,7 +446,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -187,7 +191,7 @@ index c8e4b9b..036c96b 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -395,82 +464,83 @@ jobs:
+@@ -395,82 +468,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
