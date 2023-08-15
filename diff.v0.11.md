@@ -1,6 +1,6 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index c8e4b9b..bfdb436 100644
+index c8e4b9b..a642b9e 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
 @@ -13,8 +13,9 @@ on:
@@ -52,7 +52,7 @@ index c8e4b9b..bfdb436 100644
            - oci-snapshotter-stargz
          typ:
            - integration
-@@ -182,6 +189,58 @@ jobs:
+@@ -182,6 +189,32 @@ jobs:
            SKIP_INTEGRATION_TESTS: ${{ matrix.skip-integration-tests }}
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_IT }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }}
  
@@ -82,36 +82,10 @@ index c8e4b9b..bfdb436 100644
 +          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
 +          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
 +
-+  test-azblob:
-+    runs-on: ubuntu-20.04
-+    needs:
-+      - base
-+    steps:
-+      -
-+        name: Checkout
-+        uses: actions/checkout@v3
-+      -
-+        name: Expose GitHub Runtime
-+        uses: crazy-max/ghaction-github-runtime@v2
-+      -
-+        name: Set up Docker Buildx
-+        uses: docker/setup-buildx-action@v2
-+        with:
-+          version: ${{ env.BUILDX_VERSION }}
-+          driver-opts: image=${{ env.REPO_SLUG_ORIGIN }}
-+          buildkitd-flags: --debug
-+      -
-+        name: Test
-+        run: |
-+          hack/azblob_test/run_test.sh
-+        env:
-+          ARTIFACTORY_APT_AUTH_CONF: ${{ secrets.ARTIFACTORY_APT_AUTH_CONF }}
-+          ARTIFACTORY_BASE64_GPG: ${{ secrets.ARTIFACTORY_BASE64_GPG }}
-+
    test-os:
      runs-on: ${{ matrix.os }}
      strategy:
-@@ -275,10 +334,14 @@ jobs:
+@@ -275,10 +308,14 @@ jobs:
          run: |
            ./hack/cross
          env:
@@ -127,7 +101,7 @@ index c8e4b9b..bfdb436 100644
  
    release-base:
      runs-on: ubuntu-20.04
-@@ -314,7 +377,11 @@ jobs:
+@@ -314,7 +351,12 @@ jobs:
        matrix:
          target-stage:
            - ''
@@ -137,10 +111,11 @@ index c8e4b9b..bfdb436 100644
 +      TARGET: ${{ matrix.target-stage }}
 +      RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
 +      CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
++      REGISTRY_TARGET: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ARTIFACTORY_REGISTRY_REPO || env.REPO_SLUG_TARGET }}
      steps:
        -
          name: Checkout
-@@ -328,26 +395,52 @@ jobs:
+@@ -328,26 +370,52 @@ jobs:
        -
          name: Set up Docker Buildx
          uses: docker/setup-buildx-action@v2
@@ -165,7 +140,7 @@ index c8e4b9b..bfdb436 100644
 +        name: Build local image for testing
          run: |
 -          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" "${{ needs.release-base.outputs.push }}"
-+          ./hack/images local "$REPO_SLUG_TARGET" "nopush"
++          ./hack/images local "$REGISTRY_TARGET" "nopush"
          env:
 -          RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
 -          TARGET: ${{ matrix.target-stage }}
@@ -185,13 +160,13 @@ index c8e4b9b..bfdb436 100644
 +
 +          ./hack/canonical_test/run_test.sh
 +        env:
-+          IMG_NAME: '${{ env.REPO_SLUG_TARGET }}:local'
++          IMG_NAME: '${{ env.REGISTRY_TARGET }}:local'
 +      -
 +        name: Push ${{ needs.release-base.outputs.tag }} to GHCR
 +        if: needs.release-base.outputs.push == 'push'
 +        run: |
 +          docker buildx use ${{ steps.setup-buildx-builder.outputs.name }}
-+          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" push
++          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REGISTRY_TARGET" push
 +        env:
 +          # have CACHE_FROM here cause the "env" context is not available at the job level
 +          CACHE_FROM: "type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}"
@@ -202,7 +177,7 @@ index c8e4b9b..bfdb436 100644
  
    binaries:
      runs-on: ubuntu-20.04
-@@ -375,7 +468,9 @@ jobs:
+@@ -375,7 +443,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -213,7 +188,7 @@ index c8e4b9b..bfdb436 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -395,82 +490,83 @@ jobs:
+@@ -395,82 +465,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
@@ -1992,246 +1967,6 @@ index 7b98b2b..9cb25f9 100644
  golang.org/x/tools v0.0.0-20180221164845-07fd8470d635/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
  golang.org/x/tools v0.0.0-20180525024113-a5b4c53f6e8b/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
  golang.org/x/tools v0.0.0-20180828015842-6cd1fcedba52/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
-diff --git upstream/v0.11/hack/azblob_test/Dockerfile origin/v0.11/hack/azblob_test/Dockerfile
-new file mode 100644
-index 0000000..37d5d2d
---- /dev/null
-+++ origin/v0.11/hack/azblob_test/Dockerfile
-@@ -0,0 +1,16 @@
-+FROM moby/buildkit AS buildkit
-+
-+FROM debian:bullseye-slim
-+RUN apt-get update \
-+  && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-+  && apt-get install -y --no-install-recommends ca-certificates containerd curl nodejs npm procps \
-+  && apt-get clean \
-+  && rm -rf /var/lib/apt/lists/* \
-+  && npm install -g azurite@3.18.0 \
-+  && mkdir /test \
-+  && mkdir /tmp/azurite \
-+  && curl -sL https://aka.ms/InstallAzureCLIDeb | bash
-+
-+COPY --link --from=buildkit /usr/bin/buildkitd /usr/bin/buildctl /bin/
-+
-+COPY --link . /test
-diff --git upstream/v0.11/hack/azblob_test/docker-bake.hcl origin/v0.11/hack/azblob_test/docker-bake.hcl
-new file mode 100644
-index 0000000..a0997f8
---- /dev/null
-+++ origin/v0.11/hack/azblob_test/docker-bake.hcl
-@@ -0,0 +1,15 @@
-+target "buildkit" {
-+  context = "../../"
-+  cache-from = ["type=gha,scope=binaries"]
-+  secret = [
-+    "id=ARTIFACTORY_APT_AUTH_CONF",
-+    "id=ARTIFACTORY_BASE64_GPG"
-+  ]
-+}
-+
-+target "default" {
-+  contexts = {
-+    buildkit = "target:buildkit"
-+  }
-+  tags = ["moby/buildkit:azblobtest"]
-+}
-diff --git upstream/v0.11/hack/azblob_test/run_test.sh origin/v0.11/hack/azblob_test/run_test.sh
-new file mode 100755
-index 0000000..cfcae8b
---- /dev/null
-+++ origin/v0.11/hack/azblob_test/run_test.sh
-@@ -0,0 +1,26 @@
-+#!/bin/bash -ex
-+
-+function cleanup() {
-+  docker rmi moby/buildkit:azblobtest
-+}
-+
-+trap cleanup EXIT
-+cd "$(dirname "$0")"
-+
-+docker buildx bake --load \
-+  --set buildkit.secrets=id=ARTIFACTORY_APT_AUTH_CONF \
-+  --set buildkit.secrets=id=ARTIFACTORY_BASE64_GPG
-+
-+AZURE_ACCOUNT_NAME=azblobcacheaccount
-+AZURE_ACCOUNT_URL=azblobcacheaccount.blob.localhost.com
-+AZURE_ACCOUNT_KEY=$(echo "azblobcacheaccountkey" | base64)
-+
-+docker run \
-+  --rm \
-+  --privileged \
-+  --add-host ${AZURE_ACCOUNT_URL}:127.0.0.1 \
-+  -e AZURE_ACCOUNT_NAME=${AZURE_ACCOUNT_NAME} \
-+  -e AZURE_ACCOUNT_KEY=${AZURE_ACCOUNT_KEY} \
-+  -e AZURE_ACCOUNT_URL=${AZURE_ACCOUNT_URL} \
-+  moby/buildkit:azblobtest \
-+  /test/test.sh
-diff --git upstream/v0.11/hack/azblob_test/test.sh origin/v0.11/hack/azblob_test/test.sh
-new file mode 100755
-index 0000000..adffaf0
---- /dev/null
-+++ origin/v0.11/hack/azblob_test/test.sh
-@@ -0,0 +1,131 @@
-+#!/bin/bash -ex
-+
-+# Refer to https://docs.microsoft.com/en-us/azure/storage/common/storage-use-azurite Azurite documentation
-+rm -rf /tmp/azurite
-+
-+export AZURITE_ACCOUNTS="${AZURE_ACCOUNT_NAME}:${AZURE_ACCOUNT_KEY}"
-+BLOB_PORT=10000
-+
-+azurite --silent --location /tmp/azurite --debug /tmp/azurite/azurite.debug --blobPort ${BLOB_PORT} &
-+timeout 15 bash -c "until echo > /dev/tcp/localhost/${BLOB_PORT}; do sleep 0.5; done"
-+
-+buildkitd -debugaddr 0.0.0.0:8060 &
-+while true; do
-+  curl -s -f http://127.0.0.1:8060/debug/pprof/ >/dev/null && break
-+  sleep 1
-+done
-+
-+export default_options="type=azblob,container=cachecontainer,account_url=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT},secret_access_key=${AZURE_ACCOUNT_KEY}"
-+
-+rm -rf /tmp/destdir1 /tmp/destdir2
-+
-+# First build of test1: no cache
-+buildctl build \
-+  --progress plain \
-+  --frontend dockerfile.v0 \
-+  --local context=/test/test1 \
-+  --local dockerfile=/test/test1 \
-+  --import-cache "$default_options,name=foo" \
-+  --export-cache "$default_options,mode=max,name=bar;foo" \
-+  --output type=local,dest=/tmp/destdir1
-+
-+# Check the 4 blob files and 2 manifest files in the azure blob container
-+blobCount=$(az storage blob list --output tsv --prefix blobs --container-name cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};" | wc -l)
-+if (("$blobCount" != 4)); then
-+  echo "unexpected number of blobs found: $blobCount"
-+  exit 1
-+fi
-+
-+manifestCount=$(az storage blob list --output tsv --prefix manifests --container-name cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};" | wc -l)
-+if (("$manifestCount" != 2)); then
-+  echo "unexpected number of manifests found: $manifestCount"
-+  exit 1
-+fi
-+
-+mkdir /tmp/content1
-+az storage blob download-batch -d /tmp/content1 --pattern blobs/* -s cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};"
-+
-+# Second build of test1: Test that cache was used
-+buildctl build \
-+  --progress plain \
-+  --frontend dockerfile.v0 \
-+  --local context=/test/test1 \
-+  --local dockerfile=/test/test1 \
-+  --import-cache "$default_options,name=foo" \
-+  --export-cache "$default_options,mode=max,name=bar;foo" \
-+  2>&1 | tee /tmp/log1
-+
-+# Check that the existing steps were read from the cache
-+cat /tmp/log1 | grep 'cat /dev/urandom | head -c 100 | sha256sum > unique_first' -A1 | grep CACHED
-+cat /tmp/log1 | grep 'cat /dev/urandom | head -c 100 | sha256sum > unique_second' -A1 | grep CACHED
-+
-+# No change expected in the blobs
-+mkdir /tmp/content2
-+az storage blob download-batch -d /tmp/content2 --pattern blobs/* -s cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};"
-+diff -r /tmp/content1 /tmp/content2
-+
-+# First build of test2: Test that we can reuse the cache for a different docker image
-+buildctl prune
-+buildctl build \
-+  --progress plain \
-+  --frontend dockerfile.v0 \
-+  --local context=/test/test2 \
-+  --local dockerfile=/test/test2 \
-+  --import-cache "$default_options,name=foo" \
-+  --export-cache "$default_options,mode=max,name=bar;foo" \
-+  --output type=local,dest=/tmp/destdir2 \
-+  2>&1 | tee /tmp/log2
-+
-+mkdir /tmp/content3
-+az storage blob download-batch -d /tmp/content3 --pattern blobs/* -s cachecontainer --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};"
-+
-+# There should ONLY be 1 difference between the contents of /tmp/content1 and /tmp/content3
-+# This difference is that in /tmp/content3 there should 1 extra blob corresponding to the layer: RUN cat /dev/urandom | head -c 100 | sha256sum > unique_third
-+contentDiff=$(diff -r /tmp/content1 /tmp/content3 || :)
-+if [[ ! "$contentDiff" =~ ^"Only in /tmp/content3/blobs: sha256:"[a-z0-9]{64}$ ]]; then
-+  echo "unexpected diff found $contentDiff"
-+  exit 1
-+fi
-+
-+# Check the existing steps were not executed, but read from cache
-+cat /tmp/log2 | grep 'cat /dev/urandom | head -c 100 | sha256sum > unique_first' -A1 | grep CACHED
-+
-+# Ensure cache is reused
-+rm /tmp/destdir2/unique_third
-+diff -r /tmp/destdir1 /tmp/destdir2
-+
-+# Second build of test2: Test the behavior when a blob is missing
-+az storage blob delete-batch -s cachecontainer --pattern blobs/* --connection-string "DefaultEndpointsProtocol=http;AccountName=${AZURE_ACCOUNT_NAME};AccountKey=${AZURE_ACCOUNT_KEY};BlobEndpoint=http://${AZURE_ACCOUNT_URL}:${BLOB_PORT};"
-+
-+buildctl prune
-+buildctl build \
-+  --progress plain \
-+  --frontend dockerfile.v0 \
-+  --local context=/test/test2 \
-+  --local dockerfile=/test/test2 \
-+  --import-cache "$default_options,name=foo" \
-+  2>&1 | tee /tmp/log3
-+
-+cat /tmp/log3 | grep -E 'blob.+not found' >/dev/null
-+
-+pids=""
-+
-+for i in $(seq 0 9); do
-+  buildctl build \
-+    --progress plain \
-+    --frontend dockerfile.v0 \
-+    --local context=/test/test1 \
-+    --local dockerfile=/test/test1 \
-+    --import-cache "$default_options,name=foo" \
-+    --export-cache "$default_options,mode=max,name=bar;foo" \
-+    &>/tmp/concurrencytestlog$i &
-+  pids="$pids $!"
-+done
-+
-+wait $pids
-+
-+for i in $(seq 0 9); do
-+  cat /tmp/concurrencytestlog$i | grep -q -v 'failed to upload blob '
-+done
-+
-+echo Azure blob checks ok
-diff --git upstream/v0.11/hack/azblob_test/test1/Dockerfile origin/v0.11/hack/azblob_test/test1/Dockerfile
-new file mode 100644
-index 0000000..d56dd9d
---- /dev/null
-+++ origin/v0.11/hack/azblob_test/test1/Dockerfile
-@@ -0,0 +1,7 @@
-+FROM busybox:1.35 AS build
-+RUN cat /dev/urandom | head -c 100 | sha256sum > unique_first
-+RUN cat /dev/urandom | head -c 100 | sha256sum > unique_second
-+
-+FROM scratch
-+COPY --link --from=build /unique_first /
-+COPY --link --from=build /unique_second /
-diff --git upstream/v0.11/hack/azblob_test/test2/Dockerfile origin/v0.11/hack/azblob_test/test2/Dockerfile
-new file mode 100644
-index 0000000..c0efe23
---- /dev/null
-+++ origin/v0.11/hack/azblob_test/test2/Dockerfile
-@@ -0,0 +1,9 @@
-+FROM busybox:1.35 AS build
-+RUN cat /dev/urandom | head -c 100 | sha256sum > unique_first
-+RUN cat /dev/urandom | head -c 100 | sha256sum > unique_second
-+RUN cat /dev/urandom | head -c 100 | sha256sum > unique_third
-+
-+FROM scratch
-+COPY --link --from=build /unique_first /
-+COPY --link --from=build /unique_second /
-+COPY --link --from=build /unique_third /
 diff --git upstream/v0.11/hack/canonical_test/Dockerfile origin/v0.11/hack/canonical_test/Dockerfile
 new file mode 100644
 index 0000000..8fe9186
