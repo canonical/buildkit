@@ -30,7 +30,7 @@ UBUNTU_RELEASE="focal"
 # output into an OCI archive
 OCI_IMAGE=image.tar
 
-# --builder is optional since we created the Buildx instance with --use 
+# --builder is optional since we created the Buildx instance with --use
 docker buildx build \
   -t test:latest \
   --output type=oci,dest=$OCI_IMAGE \
@@ -53,5 +53,5 @@ skopeo copy oci-archive:${OCI_IMAGE} docker-daemon:${TEST_DOCKER_IMAGE}
 
 docker run --rm ${TEST_DOCKER_IMAGE} | grep "$BUILD_ARG"
 docker run --rm ${TEST_DOCKER_IMAGE} cat /etc/os-release | grep "$UBUNTU_RELEASE"
-docker inspect ${TEST_DOCKER_IMAGE} -f '{{json .Config.Env}}' \
-  | grep BUILDPLATFORM | grep TARGETPLATFORM | grep BUILD_ARG 
+docker inspect ${TEST_DOCKER_IMAGE} -f '{{json .Config.Env}}' |
+  grep BUILDPLATFORM | grep TARGETPLATFORM | grep BUILD_ARG
