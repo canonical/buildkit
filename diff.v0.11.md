@@ -1,9 +1,21 @@
 ```diff
 diff --git upstream/v0.11/.github/workflows/build.yml origin/v0.11/.github/workflows/build.yml
-index c8e4b9b..21afb95 100644
+index c8e4b9b..bfdb436 100644
 --- upstream/v0.11/.github/workflows/build.yml
 +++ origin/v0.11/.github/workflows/build.yml
-@@ -22,10 +22,16 @@ on:
+@@ -13,8 +13,9 @@ on:
+       - 'master'
+       - 'v[0-9]+.[0-9]+'
+     tags:
+-      - 'v*'
+-      - 'dockerfile/*'
++      # Only accept tags in the format: vX.Y.Z_<serial>
++      - 'v*.*.*_*'
++      # - 'dockerfile/*'
+   pull_request:
+     paths-ignore:
+       - 'README.md'
+@@ -22,10 +23,16 @@ on:
        - 'frontend/dockerfile/docs/**'
  
  env:
@@ -22,7 +34,7 @@ index c8e4b9b..21afb95 100644
    CACHE_GHA_SCOPE_IT: "integration-tests"
    CACHE_GHA_SCOPE_BINARIES: "binaries"
    CACHE_GHA_SCOPE_CROSS: "cross"
-@@ -76,14 +82,14 @@ jobs:
+@@ -76,14 +83,14 @@ jobs:
        matrix:
          pkg:
            - ./client ./cmd/buildctl ./worker/containerd ./solver ./frontend
@@ -40,7 +52,7 @@ index c8e4b9b..21afb95 100644
            - oci-snapshotter-stargz
          typ:
            - integration
-@@ -182,6 +188,58 @@ jobs:
+@@ -182,6 +189,58 @@ jobs:
            SKIP_INTEGRATION_TESTS: ${{ matrix.skip-integration-tests }}
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_IT }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }}
  
@@ -99,7 +111,7 @@ index c8e4b9b..21afb95 100644
    test-os:
      runs-on: ${{ matrix.os }}
      strategy:
-@@ -275,10 +333,14 @@ jobs:
+@@ -275,10 +334,14 @@ jobs:
          run: |
            ./hack/cross
          env:
@@ -115,7 +127,7 @@ index c8e4b9b..21afb95 100644
  
    release-base:
      runs-on: ubuntu-20.04
-@@ -314,7 +376,11 @@ jobs:
+@@ -314,7 +377,11 @@ jobs:
        matrix:
          target-stage:
            - ''
@@ -128,7 +140,7 @@ index c8e4b9b..21afb95 100644
      steps:
        -
          name: Checkout
-@@ -328,26 +394,52 @@ jobs:
+@@ -328,26 +395,52 @@ jobs:
        -
          name: Set up Docker Buildx
          uses: docker/setup-buildx-action@v2
@@ -190,7 +202,7 @@ index c8e4b9b..21afb95 100644
  
    binaries:
      runs-on: ubuntu-20.04
-@@ -375,7 +467,9 @@ jobs:
+@@ -375,7 +468,9 @@ jobs:
            ./hack/release-tar "${{ needs.release-base.outputs.tag }}" release-out
          env:
            RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -201,7 +213,7 @@ index c8e4b9b..21afb95 100644
            CACHE_FROM: type=gha,scope=${{ env.CACHE_GHA_SCOPE_BINARIES }} type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }}
        -
          name: Upload artifacts
-@@ -395,82 +489,83 @@ jobs:
+@@ -395,82 +490,83 @@ jobs:
            files: ./release-out/*
            name: ${{ needs.release-base.outputs.tag }}
  
@@ -2268,7 +2280,7 @@ index 0000000..ba0e162
 \ No newline at end of file
 diff --git upstream/v0.11/hack/canonical_test/run_test.sh origin/v0.11/hack/canonical_test/run_test.sh
 new file mode 100755
-index 0000000..c516c65
+index 0000000..ffb5386
 --- /dev/null
 +++ origin/v0.11/hack/canonical_test/run_test.sh
 @@ -0,0 +1,57 @@
@@ -2304,7 +2316,7 @@ index 0000000..c516c65
 +# output into an OCI archive
 +OCI_IMAGE=image.tar
 +
-+# --builder is optional since we created the Buildx instance with --use 
++# --builder is optional since we created the Buildx instance with --use
 +docker buildx build \
 +  -t test:latest \
 +  --output type=oci,dest=$OCI_IMAGE \
@@ -2327,8 +2339,8 @@ index 0000000..c516c65
 +
 +docker run --rm ${TEST_DOCKER_IMAGE} | grep "$BUILD_ARG"
 +docker run --rm ${TEST_DOCKER_IMAGE} cat /etc/os-release | grep "$UBUNTU_RELEASE"
-+docker inspect ${TEST_DOCKER_IMAGE} -f '{{json .Config.Env}}' \
-+  | grep BUILDPLATFORM | grep TARGETPLATFORM | grep BUILD_ARG 
++docker inspect ${TEST_DOCKER_IMAGE} -f '{{json .Config.Env}}' |
++  grep BUILDPLATFORM | grep TARGETPLATFORM | grep BUILD_ARG
 diff --git upstream/v0.11/hack/cross origin/v0.11/hack/cross
 index 1502fd2..4e3f7d8 100755
 --- upstream/v0.11/hack/cross
