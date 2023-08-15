@@ -28,7 +28,7 @@ env:
   # tests will take place, like the Ubuntu-based builds
   REPO_SLUG_ORIGIN: "moby/buildkit:v0.11.0-rc4"
   # this is the one that matters, as it is our desired rebased output
-  REPO_SLUG_TARGET: "ghcr.io/canonical/buildkit"
+  REPO_SLUG_TARGET: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ARTIFACTORY_REGISTRY_REPO || 'ghcr.io/canonical/buildkit' }}
   # we aren't gonna touch this
   DF_REPO_SLUG_TARGET: "docker/dockerfile-upstream"
   # PLATFORMS: "linux/amd64,linux/arm/v7,linux/arm64,linux/s390x,linux/ppc64le,linux/riscv64"
@@ -356,7 +356,6 @@ jobs:
       TARGET: ${{ matrix.target-stage }}
       RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
       CACHE_TO: type=gha,scope=image${{ matrix.target-stage }}
-      REGISTRY_TARGET: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ARTIFACTORY_REGISTRY_REPO || env.REPO_SLUG_TARGET }}
     steps:
       -
         name: Checkout
@@ -386,7 +385,7 @@ jobs:
       -
         name: Build local image for testing
         run: |
-          ./hack/images local "$REGISTRY_TARGET" "nopush"
+          ./hack/images local "$REPO_SLUG_TARGET" "nopush"
         env:
           # have CACHE_FROM here cause the "env" context is not available at the job level
           CACHE_FROM: "type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}"
@@ -402,13 +401,13 @@ jobs:
 
           ./hack/canonical_test/run_test.sh
         env:
-          IMG_NAME: '${{ env.REGISTRY_TARGET }}:local'
+          IMG_NAME: '${{ env.REPO_SLUG_TARGET }}:local'
       -
         name: Push ${{ needs.release-base.outputs.tag }} to GHCR
         if: needs.release-base.outputs.push == 'push'
         run: |
           docker buildx use ${{ steps.setup-buildx-builder.outputs.name }}
-          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REGISTRY_TARGET" push
+          ./hack/images "${{ needs.release-base.outputs.tag }}" "$REPO_SLUG_TARGET" push
         env:
           # have CACHE_FROM here cause the "env" context is not available at the job level
           CACHE_FROM: "type=gha,scope=${{ env.CACHE_GHA_SCOPE_CROSS }} type=gha,scope=image${{ matrix.target-stage }}"
