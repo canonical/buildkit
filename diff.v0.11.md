@@ -2592,7 +2592,7 @@ index f2f7c4e..a7b5a78 100644
  	return out, nil
  }
 diff --git upstream/v0.11/solver/llbsolver/solver.go origin/v0.11/solver/llbsolver/solver.go
-index d65a9e6..2f7ba61 100644
+index 94d25ce..2f7ba61 100644
 --- upstream/v0.11/solver/llbsolver/solver.go
 +++ origin/v0.11/solver/llbsolver/solver.go
 @@ -423,6 +423,15 @@ func (s *Solver) Solve(ctx context.Context, id string, sessionID string, req fro
@@ -2645,6 +2645,39 @@ index d65a9e6..2f7ba61 100644
  		var err error
  		select {
  		case <-fwd.Done():
+@@ -977,21 +968,27 @@ func loadEntitlements(b solver.Builder) (entitlements.Set, error) {
+ }
+ 
+ func loadSourcePolicy(b solver.Builder) (*spb.Policy, error) {
+-	var srcPol spb.Policy
++	set := make(map[spb.Rule]struct{}, 0)
+ 	err := b.EachValue(context.TODO(), keySourcePolicy, func(v interface{}) error {
+ 		x, ok := v.(spb.Policy)
+ 		if !ok {
+ 			return errors.Errorf("invalid source policy %T", v)
+ 		}
+ 		for _, f := range x.Rules {
+-			r := *f
+-			srcPol.Rules = append(srcPol.Rules, &r)
++			set[*f] = struct{}{}
+ 		}
+-		srcPol.Version = x.Version
+ 		return nil
+ 	})
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	return &srcPol, nil
++	var srcPol *spb.Policy
++	if len(set) > 0 {
++		srcPol = &spb.Policy{}
++		for k := range set {
++			k := k
++			srcPol.Rules = append(srcPol.Rules, &k)
++		}
++	}
++	return srcPol, nil
+ }
 diff --git upstream/v0.11/solver/llbsolver/vertex.go origin/v0.11/solver/llbsolver/vertex.go
 index 41a31bb..6901332 100644
 --- upstream/v0.11/solver/llbsolver/vertex.go
